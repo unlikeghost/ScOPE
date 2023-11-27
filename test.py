@@ -1,6 +1,6 @@
-from cdc.models import EucCDC, CDCEnsabmle, CosCDC, EucCosCDC
+from ScOPE.models import EucCDC, CDCEnsabmle, CosCDC, EucCosCDC
 
-from cdc.models import MinMaxCDC
+from ScOPE.models import MinMaxCDC
 
 
 def testModelMinMax(sample, *classes):
