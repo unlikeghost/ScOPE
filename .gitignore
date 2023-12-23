@@ -12,3 +12,6 @@ profile_default/
 ipython_config.py
 
 __pypackages__/
+
+# vscode
+.vscode/*
