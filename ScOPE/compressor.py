@@ -40,7 +40,7 @@ class Compressor:
         return f'Compressor({self.compressor_name}))'
     
     def __compress_text__(self, sequence:str) -> float:
-        return float(len(self.compressor.compress(sequence.encode('utf-8'))))
+        return float(len(self.compressor.compress(sequence.encode('utf-8'), compresslevel=6)))
     
     def __compress_array__(self, sequence:np.ndarray) -> float:
         return float(len(self.compressor.compress(sequence.tobytes())))
