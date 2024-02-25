@@ -67,7 +67,7 @@ class Matrix:
 
         return distances
 
-    def get_matrix(self, sample, classes):
+    def get_matrix(self, sample: Union[str, list, np.ndarray], classes: Union[list, np.ndarray]) -> np.ndarray:
         """
         @param sample: sample to query
         @param classes: samples of known classes
@@ -82,6 +82,37 @@ class Matrix:
             samples = np.append(classes[class_], sample)
             matrix[class_, :, :] = self.__calc_matrix__(samples)
         return matrix
+
+
+class MatrixEnsamble:
+    def __init__(self, compressor_names: Union[str, list], distance_names: Union[str, list], **kwargs):
+        if compressor_names == '__all__':
+            compressor_names = ['bz2', 'gzip']
+        if distance_names == '__all__':
+            distance_names = ['cdm', 'clm', 'ncd']
+
+        self.matrices = [
+            Matrix(compressor_name=current_compressor, distance_name=current_distance, **kwargs)
+            for current_compressor in compressor_names
+            for current_distance in distance_names
+        ]
+
+    def get_matrix(self, sample: Union[str, list, np.ndarray], classes: Union[list, np.ndarray]) -> np.ndarray:
+        """
+       @param sample: sample to query
+        @param classes: samples of known classes
+        @return: Matrix with shape (#_class, len(compressor_names) * len(distance_names), len(samples) + query)
+        """
+        data: list = []
+        for matrix in self.matrices:
+            data.append(matrix.get_matrix(sample, classes))
+        data: np.ndarray = np.array(data)
+        return data.reshape(
+            data.shape[1],
+            data.shape[0],
+            data.shape[2],
+            data.shape[3]
+        )
 
 
 if __name__ == '__main__':
@@ -101,3 +132,10 @@ if __name__ == '__main__':
     class1 = np.array(['Hello', 'Goodbye', 'Good morning'])
     sample = 'Helloo'
     print(matrix.get_matrix(sample, [class0, class1]))
+
+    matrixEnsamble = MatrixEnsamble(compressor_names='__all__', distance_names='__all__',
+                                    append_type='text')
+    class0 = np.array(['Hola', 'Adios', 'Buenos dias'])
+    class1 = np.array(['Hello', 'Goodbye', 'Good morning'])
+    sample = 'Helloo'
+    print(matrixEnsamble.get_matrix(sample, [class0, class1]).shape)
