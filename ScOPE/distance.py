@@ -9,7 +9,6 @@ class Distance:
                 - ncd: Normalized Compression Distance
                 - cdm: Compression-based Distance Measure
                 - clm: Compression-based Length Measure
-                - mse: Mean Squared Error
         Raises:
             ValueError: If distance is not implemented.
         """
