@@ -1,4 +1,6 @@
 import numpy as np
+from sklearn.metrics import (roc_curve, roc_auc_score, accuracy_score,
+                             confusion_matrix)
 
 
 def generate_samples(x: np.ndarray, y: np.ndarray, samples: int = 5) -> tuple:
@@ -19,3 +21,19 @@ def generate_samples(x: np.ndarray, y: np.ndarray, samples: int = 5) -> tuple:
 
 def gauss(x: np.ndarray, sigma: float = 0.12) -> np.ndarray:
     return np.exp(-0.5 * np.square((x/sigma)))
+
+
+def make_report(y_true, y_pred, y_pred_auc):
+    fpr, tpr, thresholds = roc_curve(y_true, np.array(y_pred_auc)[:, 1])
+    auc_roc = roc_auc_score(y_true, np.array(y_pred_auc)[:, 1])
+
+    this_data: dict = {
+        'fpr': fpr,
+        'tpr': tpr,
+        'thresholds': thresholds,
+        'auc_roc': auc_roc,
+        'acc': accuracy_score(y_true, y_pred),
+        'confusion_matrix': confusion_matrix(y_true, y_pred)
+    }
+
+    return this_data
