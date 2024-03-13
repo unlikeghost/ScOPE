@@ -35,7 +35,7 @@ class MatchingMethods:
 
 if __name__ == '__main__':
     x1: np.ndarray = np.array([1, 2, 3, 4, 5])
-    x2: np.ndarray = np.array([1, 2, 5, 4, 6])
+    x2: np.ndarray = np.array([1])
 
     mm_str = MatchingMethods(x1, x2, 'dice')
     print(mm_str())

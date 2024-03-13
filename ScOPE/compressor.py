@@ -77,7 +77,8 @@ class Compressor:
             print(f'Error: {type(sequence)} is not a supported type')
             print(f'Please choose one of the following: {self.__supported_types__}')
             raise ValueError
-    
+
+
 if __name__ == '__main__':
     compressor = Compressor('gzip')
     print(compressor)

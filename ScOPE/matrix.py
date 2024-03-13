@@ -1,5 +1,4 @@
 import numpy as np
-from typing import Union
 from ScOPE.distance import Distance
 from ScOPE.compressor import Compressor
 
@@ -31,7 +30,7 @@ class Matrix:
     def __str__(self) -> str:
         return f'Matrix({self.compressor}, {self.distance})'
 
-    def join(self, x1, x2) -> Union[str, np.ndarray]:
+    def join(self, x1, x2) -> str | np.ndarray:
         """
         Way to join two samples
         @param x1: sample 1
@@ -67,7 +66,7 @@ class Matrix:
 
         return distances
 
-    def get_matrix(self, sample: Union[str, list, np.ndarray], classes: Union[list, np.ndarray]) -> np.ndarray:
+    def get_matrix(self, sample: str | list | np.ndarray, classes: list | np.ndarray) -> np.ndarray:
         """
         @param sample: sample to query
         @param classes: samples of known classes
@@ -85,7 +84,7 @@ class Matrix:
 
 
 class MatrixEnsamble:
-    def __init__(self, compressor_names: Union[str, list], distance_names: Union[str, list], **kwargs):
+    def __init__(self, compressor_names: str | list, distance_names: str | list, **kwargs):
         if compressor_names == '__all__':
             compressor_names = ['bz2', 'gzip']
         if distance_names == '__all__':
@@ -97,7 +96,7 @@ class MatrixEnsamble:
             for current_distance in distance_names
         ]
 
-    def get_matrix(self, sample: Union[str, list, np.ndarray], classes: Union[list, np.ndarray]) -> np.ndarray:
+    def get_matrix(self, sample: str | list | np.ndarray, classes: list | np.ndarray) -> np.ndarray:
         """
        @param sample: sample to query
         @param classes: samples of known classes
