@@ -9,7 +9,6 @@ class Distance:
                 - ncd: Normalized Compression Distance
                 - cdm: Compression-based Distance Measure
                 - clm: Compression-based Length Measure
-                - mse: Mean Squared Error
         Raises:
             ValueError: If distance is not implemented.
         """
@@ -104,6 +103,7 @@ class Distance:
         
         return self.distance(**kwargs)
 
+
 if __name__ == '__main__':
     from compressor import Compressor
     compressor = Compressor('gzip')
@@ -118,8 +118,3 @@ if __name__ == '__main__':
     x2 = compressor(['Adios'])
     x1x2 = compressor(['Hola Adios'])
     print(distance(x1=x1, x2=x2, x1x2=x1x2))
-    
-    # x1 = compressor([1, 2, 3, 4, 5])
-    # x2 = compressor([1, 2, 3, 4, 5, 6])
-    # x1x2 = compressor([[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]])
-    # print(distance(x1=x1, x2=x2, x1x2=x1x2))

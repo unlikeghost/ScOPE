@@ -21,7 +21,7 @@ class Compressor:
             ValueError: If compressor is not one of the following: {'bz2', 'gzip', 'zlib'}
         """
         
-        __supported_compressors__ = {'bz2', 'gzip', 'zlib'}
+        __supported_compressors__ = {'bz2', 'gzip'}
         
         self.__supported_types__ = {'str', 'array'}
         
@@ -40,7 +40,7 @@ class Compressor:
         return f'Compressor({self.compressor_name}))'
     
     def __compress_text__(self, sequence:str) -> float:
-        return float(len(self.compressor.compress(sequence.encode('utf-8'), compresslevel=6)))
+        return float(len(self.compressor.compress(sequence.encode('utf-8'), compresslevel=5)))
     
     def __compress_array__(self, sequence:np.ndarray) -> float:
         return float(len(self.compressor.compress(sequence.tobytes())))
@@ -77,7 +77,8 @@ class Compressor:
             print(f'Error: {type(sequence)} is not a supported type')
             print(f'Please choose one of the following: {self.__supported_types__}')
             raise ValueError
-    
+
+
 if __name__ == '__main__':
     compressor = Compressor('gzip')
     print(compressor)
