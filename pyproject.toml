@@ -23,6 +23,7 @@ build-backend = "uv_build"
 [dependency-groups]
 experiments = [
     "cmaes>=0.12.0",
+    "deepchem>=2.8.0",
     "matplotlib>=3.10.5",
     "optunahub>=0.3.1",
     "scipy>=1.16.1",

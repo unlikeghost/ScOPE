@@ -14,7 +14,7 @@ from scope.model import ScOPE
 from scope.utils.report_generation import make_report
 from .params import ParameterSpace
 
-warnings.filterwarnings('ignore')
+# warnings.filterwarnings('ignore')
 
 
 class ScOPEOptimizer(ABC):
@@ -320,7 +320,6 @@ class ScOPEOptimizer(ABC):
                     try:
                         # Process one sample at a time (like the original)
                         predictions = model(samples=sample, kw_samples=kw_sample)
-                        
                         # Extract the first prediction from the list
                         if isinstance(predictions, list) and len(predictions) > 0:
                             prediction = predictions[0]
@@ -349,11 +348,9 @@ class ScOPEOptimizer(ABC):
                         y_pred_proba.append(proba_values)
                         
                     except Exception as e:
-                        print("ERROR!!!")
+                        print('Some error on prediction come up')
                         print(e)
-                        print(model.to_dict())
                        
-
                         # Handle error by using random predictions
                         random_pred = np.random.randint(0, 2)
                         y_pred.append(random_pred)

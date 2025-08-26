@@ -5,8 +5,6 @@ import warnings
 import numpy as np
 from copy import deepcopy
 from itertools import product
-# from scipy.stats import gmean
-# from scipy.stats.mstats import hdmedian, 
 from scipy.stats.mstats import hmean
 from typing import Union, List, Dict, Optional, Tuple
 
@@ -81,16 +79,31 @@ class CompressionMatrix:
                 *[input_sequence[i:] for i in range(n)]
             )
         )
-
+    
     def __get_compression_size__(self, sequence: str, compressor: str) -> int:
-        compressed_sequence = compute_compression(
-            sequence=sequence,
-            compressor=compressor,
-            compression_level=self.compression_level,
-            min_size_threshold=self.min_size_threshold
-        )
-        return len(compressed_sequence)
-
+            if len(sequence) == 0:
+                print(f"WARNING: Empty sequence for compression with {compressor}")
+                return 0
+            
+            compressed_sequence = compute_compression(
+                sequence=sequence,
+                compressor=compressor,
+                compression_level=self.compression_level,
+                min_size_threshold=self.min_size_threshold
+            )
+            
+            size = len(compressed_sequence)
+            if size == 0:
+                raise ValueError(
+                    f"Compression resulted in zero-size output for compressor '{compressor}'. "
+                    f"Original sequence length: {len(sequence)}. "
+                    f"This may indicate an issue with the compressor configuration, "
+                    f"min_size_threshold ({self.min_size_threshold}), or input data. "
+                    f"Consider using a different compressor or adjusting parameters."
+                )
+                
+            return size
+            
     def __string_concatenation__(self, x1: str, x2: str, compressor: str) -> str:
         """Find concatenation order with best compression ratio for two sequences."""
 
@@ -112,11 +125,7 @@ class CompressionMatrix:
 
     def __multiset_to_string__(self, multiset: Union[List, set]) -> str:
 
-        if isinstance(multiset, set):
-            unique_items = multiset
-
-        if isinstance(multiset, (list, tuple)):
-            unique_items = set(multiset)
+        unique_items = set(multiset)
 
         sorted_items = sorted(unique_items, key=str)
 

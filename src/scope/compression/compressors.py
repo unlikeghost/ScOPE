@@ -74,6 +74,13 @@ class _BaseCompressor(ABC):
         Returns:
             bytes: The compressed data.
         """
+        if len(sequence) == 0:
+            raise ValueError(
+                f"Empty sequence provided to {self._compressor_name} compressor. "
+                f"Compression requires non-empty input data. "
+                f"Check your data preprocessing pipeline for sources of empty strings."
+            )
+                
         if not isinstance(sequence, (bytes, str)):
             raise TypeError("Input sequence must be of type 'str' or 'bytes'.")
         

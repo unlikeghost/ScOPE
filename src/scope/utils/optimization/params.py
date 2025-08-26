@@ -33,7 +33,7 @@ class ParameterSpace:
     )
     
     aggregation_method_options: List[str] = field(
-        default_factory= lambda: ['mean', 'median', 'sum', None]
+        default_factory= lambda: ['mean', 'median', 'sum', 'gmean', None]
     )
     
     # Enteros
@@ -45,7 +45,7 @@ class ParameterSpace:
     )
     
     qval_range: List[int] = field(
-        default_factory=lambda: (-1, 10)
+        default_factory=lambda: (-1, 8)
     )
 
     # Booleanos

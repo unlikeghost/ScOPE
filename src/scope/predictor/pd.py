@@ -59,8 +59,4 @@ class ScOPEPD(_BasePredictor):
         else:
             score = float(score)
         
-        # Validate result
-        if np.isnan(score) or np.isinf(score):
-            raise ValueError(f"Invalid score calculated: {score}. Check input data for NaN or Inf values.")
-        
         return score
