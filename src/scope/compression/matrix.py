@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+"""
+    ScOPE
+    Compression Matrix
+    Jesus Alan Heernandez Galvan
+"""
 
 import json
 import warnings
@@ -9,17 +14,24 @@ from scipy.stats.mstats import hmean
 from typing import Union, List, Dict, Optional, Tuple
 
 from .compressors import compute_compression
-from .metrics import compute_compression_metric
+from .dissimilarity import compute_compression_metric
 
 
 class CompressionMatrix:
 
     compressors = {'bz2': 0, 'zlib': 1, 'zstd': 2, 'rle': 3, 'huffman': 4, 'lz77': 5}
 
-    compression_metrics = {'ncd': 0, 'cdm': 1, 'nrc': 2}
+    compression_metrics = {
+        'ncd': 0,
+        'cdm': 1,
+        'cd': 2,
+        'ucd': 3,
+        'ncc': 4,
+        'nccd': 5
+    }
 
     def __init__(self,
-                 compressors_names: Union[str, List[str]] = 'gzip',
+                 compressor_names: Union[str, List[str]] = 'gzip',
                  compression_metric_names: Union[str, List[str]] = 'ncd',
                  compression_level: int = 9,
                  min_size_threshold: int = 0,
@@ -31,13 +43,13 @@ class CompressionMatrix:
         if qval == -1:
             qval = None
 
-        if isinstance(compressors_names, str):
-            compressors_names = [compressors_names]
+        if isinstance(compressor_names, str):
+            compressor_names = [compressor_names]
 
         if isinstance(compression_metric_names, str):
             compression_metric_names = [compression_metric_names]
 
-        invalid_compressors = [c for c in compressors_names if c not in self.compressors]
+        invalid_compressors = [c for c in compressor_names if c not in self.compressors]
         if invalid_compressors:
             raise ValueError(
                 f"Invalid compressor(s): {', '.join(invalid_compressors)}. "
@@ -66,7 +78,7 @@ class CompressionMatrix:
         self.compression_level = compression_level
         self.min_size_threshold = min_size_threshold
         self.join_string = join_string
-        self.compressors_names = set(compressors_names)
+        self.compressor_names = set(compressor_names)
         self.compression_metric_names = set(compression_metric_names)
         self.get_sigma = get_sigma
 
@@ -105,22 +117,6 @@ class CompressionMatrix:
             return size
             
     def __string_concatenation__(self, x1: str, x2: str, compressor: str) -> str:
-        """Find concatenation order with best compression ratio for two sequences."""
-
-        # sequences = [x1, x2]
-        # best_size = float('inf')
-        # best_concatenation = ""
-
-        # for permutation in permutations(sequences):
-        #     concatenated = self.join_string.join(permutation)
-        #     size = self.__get_compression_size__(concatenated, compressor)
-
-        #     if size < best_size:
-        #         best_size = size
-        #         best_concatenation = concatenated
-
-        # return best_concatenation
-
         return self.join_string.join([x1, x2])
 
     def __multiset_to_string__(self, multiset: Union[List, set]) -> str:
@@ -151,7 +147,7 @@ class CompressionMatrix:
 
         def _compute(x1: str) -> List[float]:
             sigmas: list = []
-            for compressor in self.compressors_names:
+            for compressor in self.compressor_names:
                 x1x2: str = self.__string_concatenation__(x1=x1, x2=x1, compressor=compressor)
                 c_x1 = self.__get_compression_size__(x1, compressor)
                 c_x2 = self.__get_compression_size__(x1, compressor)
@@ -162,6 +158,7 @@ class CompressionMatrix:
                         c_x1=c_x1,
                         c_x2=c_x2,
                         c_x1x2=c_x1x2,
+                        c_x2x1=c_x1x2,
                         metric=metric
                     )
                     sigmas.append(values)
@@ -169,9 +166,9 @@ class CompressionMatrix:
             return sigmas
         sigmas = np.array(
             list(map(_compute, samples))
-        ).flatten()
+        )
 
-        sigma = hmean(sigmas)
+        sigma = hmean(sigmas, axis=1)
         
         return sigma
 
@@ -192,14 +189,17 @@ class CompressionMatrix:
             x1 = self.__multiset_to_string__(processed_query)
             x2 = self.__multiset_to_string__(processed_class)
 
-        for compressor in self.compressors_names:
+        for compressor in self.compressor_names:
             compressor_index = self.compressors[compressor]
 
             x1x2: str = self.__string_concatenation__(x1=x1, x2=x2, compressor=compressor)
-
+            x2x1: str = self.__string_concatenation__(x1=x2, x2=x1, compressor=compressor)
+            
             c_x1 = self.__get_compression_size__(x1, compressor)
             c_x2 = self.__get_compression_size__(x2, compressor)
             c_x1x2 = self.__get_compression_size__(x1x2, compressor)
+            c_x2x1 = self.__get_compression_size__(x2x1, compressor)
+
 
             for metric in self.compression_metric_names:
                 metric_index = self.compression_metrics[metric]
@@ -208,13 +208,14 @@ class CompressionMatrix:
                     c_x1=c_x1,
                     c_x2=c_x2,
                     c_x1x2=c_x1x2,
+                    c_x2x1=c_x2x1,
                     metric=metric
                 )
 
         nan_mask = ~np.isnan(matrix_values)
 
         result = matrix_values[nan_mask].reshape(
-            len(self.compressors_names),
+            len(self.compressor_names),
             len(self.compression_metric_names)
         )
 
@@ -234,7 +235,7 @@ class CompressionMatrix:
             shape=(
                 1,
                 len(cluster),
-                len(self.compressors_names),
+                len(self.compressor_names),
                 len(self.compression_metric_names),
             )
         )
@@ -243,7 +244,7 @@ class CompressionMatrix:
             shape=(
                 len(cluster) - 1,
                 len(cluster),
-                len(self.compressors_names),
+                len(self.compressor_names),
                 len(self.compression_metric_names),
             )
         )

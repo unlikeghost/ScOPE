@@ -1,8 +1,8 @@
 from scope.compression import CompressionMatrix
 
 cm = CompressionMatrix(
-    compressors_names=['bz2', 'zlib', 'zstd', 'rle', 'huffman', 'lz77'],
-    compression_metric_names=['ncd', 'nrc'],
+    compressor_names=['bz2', 'zlib', 'zstd', 'rle', 'huffman', 'lz77'],
+    compression_metric_names=['ncd', 'cdm', 'cd', 'ucd', 'ncc', 'nccd'],
     join_string='',
     compression_level=9,
     # min_size_threshold=50,
