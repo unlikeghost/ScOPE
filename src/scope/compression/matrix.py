@@ -129,19 +129,19 @@ class CompressionMatrix:
 
     def __get_sequences__(self, sequence: str) -> List[str]:
 
-        processed = []
+            processed = []
 
-        if isinstance(sequence, str):
-            if self.qval == 0:
-                # Split by words/spaces
-                processed.append(sequence.split())
-            elif self.qval == 1:
-                # Character-level
-                processed.append(list(sequence))
-            else:
-                processed.append(self.__find_ngrams__(sequence, self.qval))
+            if isinstance(sequence, str):
+                if self.qval == 0:
+                    # Split by words/spaces
+                    processed.append(sequence.split())
+                elif self.qval == 1:
+                    # Character-level
+                    processed.append(list(sequence))
+                elif self.qval is not None:
+                    processed.append(self.__find_ngrams__(sequence, self.qval))
 
-        return processed[0]
+            return processed[0]
 
     def compute_sigma(self, samples: List[str]) -> float:
 
@@ -166,11 +166,11 @@ class CompressionMatrix:
             return sigmas
         sigmas = np.array(
             list(map(_compute, samples))
-        )
+        ).flatten()
 
-        sigma = hmean(sigmas, axis=1)
+        sigma = hmean(sigmas)
         
-        return sigma
+        return sigma.item()
 
     def compute_ovo(self, x1: str, x2: str) -> np.ndarray:
 
@@ -270,7 +270,7 @@ class CompressionMatrix:
 
         return sample_matrix, cluster_matrix, sigma
 
-    def get_one_compression_matrix(self, sample: str, kw_samples: Dict[Union[int, str], str]) ->  Dict[str, np.ndarray]:
+    def get_one_compression_matrix(self, sample: str, kw_samples: Dict[Union[int, str], List[str]]) ->  Dict[str, np.ndarray]:
 
         if not isinstance(kw_samples, dict):
             raise ValueError(
@@ -320,7 +320,7 @@ class CompressionMatrix:
 
         return results
 
-    def get_multiple_compression_matrix(self, samples: List[str], kw_samples: List[Dict[Union[int, str], str]]) ->  List[Dict[str, np.ndarray]]:
+    def get_multiple_compression_matrix(self, samples: List[str], kw_samples: List[Dict[Union[int, str], List[str]]]) ->  List[Dict[str, np.ndarray]]:
 
         results = []
 
@@ -342,8 +342,8 @@ class CompressionMatrix:
 
     def __call__(self,
                  samples: Union[List[str], str],
-                 kw_samples: Union[Dict[Union[int, str], str],
-                                   List[Dict[Union[int, str], str]]]) ->  Union[Dict[str, np.ndarray], List[Dict[str, np.ndarray]]]:
+                 kw_samples: Union[Dict[Union[int, str], List[str]],
+                                   List[Dict[Union[int, str], List[str]]]]) ->  Union[Dict[str, np.ndarray], List[Dict[str, np.ndarray]]]:
 
         if isinstance(samples, str):
             samples = [samples]

@@ -2,7 +2,7 @@ from typing import List, Dict
 from dataclasses import dataclass, field
 from itertools import chain, combinations
 
-from scope.compression.metrics import COMPRESSION_METRICS
+from scope.compression.dissimilarity import COMPRESSION_METRICS
 from scope.compression.compressors import CompressorType
 
 
@@ -40,8 +40,9 @@ class ParameterSpace:
     compression_levels_range: List[int] = field(
         default_factory=lambda: (1, 9)
     )
+    
     min_size_thresholds_range: List[int] = field(
-        default_factory=lambda: (0, 50)
+        default_factory=lambda: range(0, 50)
     )
     
     qval_range: List[int] = field(

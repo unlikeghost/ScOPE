@@ -12,7 +12,7 @@ class ScOPE:
     def __init__(self,
                  model_type: str,
                  aggregation_method: Optional[str] = None,
-                 compressors_names: Union[str, List[str]] = 'gzip',
+                 compressor_names: Union[str, List[str]] = 'gzip',
                  compression_metric_names: Union[str, List[str]] = 'ncd',
                  compression_level: int = 9,
                  min_size_threshold: int = 0,
@@ -29,7 +29,7 @@ class ScOPE:
         )
         
         self.compression_matrix: CompressionMatrix = CompressionMatrix(
-            compressors_names=compressors_names,
+            compressor_names=compressor_names,
             compression_metric_names=compression_metric_names,
             compression_level=compression_level,
             min_size_threshold=min_size_threshold,
@@ -44,7 +44,7 @@ class ScOPE:
             model_kwargs
         )
 
-        self._compressor_names = compressors_names
+        self._compressor_names = compressor_names
         self._compression_metric_names = compression_metric_names
         self._compression_level = compression_level
         self._min_size_threshold = min_size_threshold
@@ -62,7 +62,7 @@ class ScOPE:
     def to_dict(self) -> dict:
         
         params = {
-            'compressors_names': self._compressor_names,
+            'compressor_names': self._compressor_names,
             'compression_metric_names': self._compression_metric_names,
             'compression_level': self._compression_level,
             'min_size_threshold': self._min_size_threshold,

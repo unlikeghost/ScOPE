@@ -142,7 +142,7 @@ class ScOPEOptimizer(ABC):
         base_params = {
             'model_type': params['model_type'],
             'aggregation_method': aggregation_method,
-            'compressors_names': compressor_names,  # Note: uses 'compressors_names' not 'compressor_names'
+            'compressor_names': compressor_names,  # Note: uses 'compressors_names' not 'compressor_names'
             'compression_metric_names': compression_metric_names,
             'compression_level': params['compression_level'],
             'min_size_threshold': params['min_size_threshold'],

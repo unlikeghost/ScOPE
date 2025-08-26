@@ -37,20 +37,20 @@ class BaseCompressor(ABC):
             compression_level: Compression level (1-9, where 9 is maximum)
             min_size_threshold: Minimum size for effective compression
             padding_method: Method for padding small sequences ('zeros' or 'repeat')
-        
+
         Raises:
             ValueError: If compression level is not between 1-9 or invalid padding method
         """
         if not 1 <= compression_level <= 9:
             raise ValueError("Compression level must be between 1 and 9")
-        
+
         if min_size_threshold and min_size_threshold > 0:
             if padding_method and padding_method not in {"zeros", "repeat"}:
                 raise ValueError("padding_method must be 'zeros' or 'repeat'")
             padding_method = padding_method or 'zeros'
 
         self._min_size_threshold = min_size_threshold or 0
-        self._padding_method: str = padding_method
+        self._padding_method: Optional[str] = padding_method
         self._compressor_name: str = compressor_name
         self._compression_level: int = compression_level
     

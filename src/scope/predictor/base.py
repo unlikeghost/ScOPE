@@ -107,7 +107,7 @@ class _BasePredictor(ABC):
                 
                 _, _, n_compressors, n_metrics = cluster_.shape
                 
-                if data_matrix.get(f'{self.start_key_sigma}_{real_cluster_name}'):
+                if f'{self.start_key_sigma}_{real_cluster_name}' in data_matrix:
                     sigma = data_matrix[f'{self.start_key_sigma}_{real_cluster_name}']
                     cluster_ = self.__compute_gaussian_function__(
                         cluster_,
