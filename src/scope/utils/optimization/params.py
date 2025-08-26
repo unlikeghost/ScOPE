@@ -42,7 +42,7 @@ class ParameterSpace:
     )
     
     min_size_thresholds_range: List[int] = field(
-        default_factory=lambda: range(0, 50)
+        default_factory=lambda: (0, 50)
     )
     
     qval_range: List[int] = field(

@@ -94,8 +94,8 @@ class CompressionMatrix:
     
     def __get_compression_size__(self, sequence: str, compressor: str) -> int:
             if len(sequence) == 0:
-                print(f"WARNING: Empty sequence for compression with {compressor}")
-                return 0
+                raise ValueError(f"WARNING: Empty sequence for compression with {compressor}")
+                exit(0)
             
             compressed_sequence = compute_compression(
                 sequence=sequence,
@@ -106,13 +106,14 @@ class CompressionMatrix:
             
             size = len(compressed_sequence)
             if size == 0:
-                raise ValueError(
+                print(
                     f"Compression resulted in zero-size output for compressor '{compressor}'. "
                     f"Original sequence length: {len(sequence)}. "
                     f"This may indicate an issue with the compressor configuration, "
                     f"min_size_threshold ({self.min_size_threshold}), or input data. "
                     f"Consider using a different compressor or adjusting parameters."
                 )
+                size = 1e-12
                 
             return size
             
@@ -161,13 +162,19 @@ class CompressionMatrix:
                         c_x2x1=c_x1x2,
                         metric=metric
                     )
+                    
+                    values = max(values, 1e-12)
                     sigmas.append(values)
 
             return sigmas
         sigmas = np.array(
             list(map(_compute, samples))
         ).flatten()
-
+        
+        # sigmas = np.abs(sigmas)
+    
+        # sigmas[sigmas == 0] = 1e-12
+        
         sigma = hmean(sigmas)
         
         return sigma.item()
