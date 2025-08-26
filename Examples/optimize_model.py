@@ -23,8 +23,8 @@ y_validation = [0]*12 + [1]*12
 
 kw_samples_validation = [
     {
-        "0": ["toxic harmful dangerous poison lethal", "mercury lead arsenic cyanide"], 
-        "1": ["safe harmless beneficial healthy natural", "water vitamin protein calcium"]
+        0: ["toxic harmful dangerous poison lethal", "mercury lead arsenic cyanide"], 
+        1: ["safe harmless beneficial healthy natural", "water vitamin protein calcium"]
     }
     for _ in range(24)
 ]
