@@ -25,7 +25,7 @@ class ParameterSpace:
     )
     
     concat_value_options: List[str] = field(
-        default_factory=lambda: [' ', '', '\n']
+        default_factory= lambda: ["|||SEP_SAFE_DELIM_SEP|||"]
     )
     
     model_types_options: List[str] = field(
@@ -39,10 +39,6 @@ class ParameterSpace:
     # Enteros
     compression_levels_range: List[int] = field(
         default_factory=lambda: (1, 9)
-    )
-    
-    min_size_thresholds_range: List[int] = field(
-        default_factory=lambda: (0, 50)
     )
     
     qval_range: List[int] = field(

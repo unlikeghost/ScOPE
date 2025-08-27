@@ -35,6 +35,9 @@ class _BasePredictor(ABC):
     
     def __compute_aggregated_prototype__(self, data: np.ndarray) -> np.ndarray:
         """Compute prototype using specified aggregation method"""
+        if self.aggregation_method is None:
+            raise ValueError("Aggregation method cannot be None when computing prototype")
+
         prototype = self.valid_methods[self.aggregation_method](
             data
         )

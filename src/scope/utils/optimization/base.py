@@ -79,7 +79,6 @@ class ScOPEOptimizer(ABC):
                 'compressor_names': getattr(model, '_compressor_names', []),
                 'compression_metric_names': getattr(model, '_compression_metric_names', []),
                 'compression_level': getattr(model, '_compression_level', 9),
-                'min_size_threshold': getattr(model, '_min_size_threshold', 0),
                 'join_string': getattr(model, '_join_string', ''),
                 'get_sigma': getattr(model, '_get_sigma', True),
                 'qval': getattr(model, '_qval', -1),
@@ -102,7 +101,6 @@ class ScOPEOptimizer(ABC):
         print(f"  • Compressor combinations ({len(self.parameter_space.compressor_names_options)})")
         print(f"  • Compression metric combinations ({len(self.parameter_space.compression_metric_names_options)})")
         print(f"  • Compression levels range: {self.parameter_space.compression_levels_range}") 
-        print(f"  • Min size thresholds range: {self.parameter_space.min_size_thresholds_range}")
         print(f"  • QVal range: {self.parameter_space.qval_range}")
         print(f"  • Join string options ({len(self.parameter_space.concat_value_options)}): {[repr(s) for s in self.parameter_space.concat_value_options]}")
         print(f"  • Get sigma options: {self.parameter_space.get_sigma_options}")
@@ -145,7 +143,6 @@ class ScOPEOptimizer(ABC):
             'compressor_names': compressor_names,  # Note: uses 'compressors_names' not 'compressor_names'
             'compression_metric_names': compression_metric_names,
             'compression_level': params['compression_level'],
-            'min_size_threshold': params['min_size_threshold'],
             'join_string': params['join_string'],  # Updated from concat_value
             'get_sigma': params['get_sigma'],
             'qval': params['qval'],
@@ -207,10 +204,6 @@ class ScOPEOptimizer(ABC):
             'compression_level': trial.suggest_int(
                 'compression_level',
                 *self.parameter_space.compression_levels_range
-            ),
-            'min_size_threshold': trial.suggest_int(
-                'min_size_threshold',
-                *self.parameter_space.min_size_thresholds_range
             ),
             'qval': trial.suggest_int(
                 'qval',

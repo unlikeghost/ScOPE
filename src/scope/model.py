@@ -15,7 +15,6 @@ class ScOPE:
                  compressor_names: Union[str, List[str]] = 'gzip',
                  compression_metric_names: Union[str, List[str]] = 'ncd',
                  compression_level: int = 9,
-                 min_size_threshold: int = 0,
                  join_string: str = '',
                  get_sigma: bool = True,
                  qval: Optional[int] = -1,
@@ -32,7 +31,6 @@ class ScOPE:
             compressor_names=compressor_names,
             compression_metric_names=compression_metric_names,
             compression_level=compression_level,
-            min_size_threshold=min_size_threshold,
             join_string=join_string,
             get_sigma=get_sigma,
             qval=qval
@@ -47,7 +45,6 @@ class ScOPE:
         self._compressor_names = compressor_names
         self._compression_metric_names = compression_metric_names
         self._compression_level = compression_level
-        self._min_size_threshold = min_size_threshold
         self._join_string = join_string
         self._get_sigma = get_sigma
         self._qval = qval
@@ -65,7 +62,6 @@ class ScOPE:
             'compressor_names': self._compressor_names,
             'compression_metric_names': self._compression_metric_names,
             'compression_level': self._compression_level,
-            'min_size_threshold': self._min_size_threshold,
             'join_string': self._join_string,
             'get_sigma': self._get_sigma,
             'model_type': self._model_type,
@@ -96,7 +92,7 @@ class ScOPE:
     def forward(self, list_of_data: Union[List[Dict[str, np.ndarray]], Dict[str, np.ndarray]]) -> List[Dict[str, Any]]:
                 
         if len(list_of_data) == 0:
-            return predictions
+            return []
         
         predictions = self.predictor(list_of_data)
         

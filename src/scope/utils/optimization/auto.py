@@ -356,7 +356,7 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             print("\nTop 5 configurations (AutoSampler discoveries):")
             columns_to_show = ['value', 'params_compressor_names', 'params_compression_metric_names', 
                               'params_model_type', 'params_get_sigma', 'params_aggregation_method',
-                              'params_join_string', 'params_compression_level', 'params_min_size_threshold',
+                              'params_join_string', 'params_compression_level',
                               'params_qval']
             
             # Add model-specific columns if they exist
@@ -439,7 +439,6 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             f.write(f"Compressor combinations: {len(self.parameter_space.compressor_names_options)}\n")
             f.write(f"Compression metric combinations: {len(self.parameter_space.compression_metric_names_options)}\n")
             f.write(f"Compression levels range: {self.parameter_space.compression_levels_range}\n")
-            f.write(f"Min size thresholds range: {self.parameter_space.min_size_thresholds_range}\n")
             f.write(f"QVal range: {self.parameter_space.qval_range}\n")
             f.write(f"Join string options: {self.parameter_space.concat_value_options}\n")
             f.write(f"Get sigma options: {self.parameter_space.get_sigma_options}\n")

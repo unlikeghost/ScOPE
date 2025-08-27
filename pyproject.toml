@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "numpy>=2.3.2",
     "optuna>=4.4.0",
+    "optuna-dashboard>=0.19.0",
     "pandas>=2.3.1",
     "pot>=0.9.5",
     "scikit-learn>=1.7.1",
@@ -26,6 +27,7 @@ experiments = [
     "deepchem>=2.8.0",
     "matplotlib>=3.10.5",
     "optunahub>=0.3.1",
+    "rdkit>=2025.3.5",
     "scipy>=1.16.1",
     "torch>=2.8.0",
 ]

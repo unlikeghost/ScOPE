@@ -18,8 +18,16 @@ from .dissimilarity import compute_compression_metric
 
 
 class CompressionMatrix:
-
-    compressors = {'bz2': 0, 'zlib': 1, 'zstd': 2, 'rle': 3, 'huffman': 4, 'lz77': 5}
+        
+    compressors = {
+        'bz2': 0,
+        'zlib': 1,
+        'zstd': 2,
+        'rle': 3,
+        'huffman': 4,
+        'lz77': 5,
+        'gzip': 6
+    }
 
     compression_metrics = {
         'ncd': 0,
@@ -34,7 +42,6 @@ class CompressionMatrix:
                  compressor_names: Union[str, List[str]] = 'gzip',
                  compression_metric_names: Union[str, List[str]] = 'ncd',
                  compression_level: int = 9,
-                 min_size_threshold: int = 0,
                  join_string: str = '',
                  get_sigma: bool = True,
                  qval: Optional[int] = -1
@@ -76,7 +83,6 @@ class CompressionMatrix:
 
         self.qval = qval
         self.compression_level = compression_level
-        self.min_size_threshold = min_size_threshold
         self.join_string = join_string
         self.compressor_names = set(compressor_names)
         self.compression_metric_names = set(compression_metric_names)
@@ -92,29 +98,18 @@ class CompressionMatrix:
             )
         )
     
-    def __get_compression_size__(self, sequence: str, compressor: str) -> int:
+    def __get_compression_size__(self, sequence: str, compressor: str) -> float:
             if len(sequence) == 0:
                 raise ValueError(f"WARNING: Empty sequence for compression with {compressor}")
-                exit(0)
-            
+                            
             compressed_sequence = compute_compression(
                 sequence=sequence,
                 compressor=compressor,
                 compression_level=self.compression_level,
-                min_size_threshold=self.min_size_threshold
             )
             
             size = len(compressed_sequence)
-            if size == 0:
-                print(
-                    f"Compression resulted in zero-size output for compressor '{compressor}'. "
-                    f"Original sequence length: {len(sequence)}. "
-                    f"This may indicate an issue with the compressor configuration, "
-                    f"min_size_threshold ({self.min_size_threshold}), or input data. "
-                    f"Consider using a different compressor or adjusting parameters."
-                )
-                size = 1e-12
-                
+         
             return size
             
     def __string_concatenation__(self, x1: str, x2: str, compressor: str) -> str:
@@ -155,7 +150,7 @@ class CompressionMatrix:
                 c_x1x2 = self.__get_compression_size__(x1x2, compressor)
 
                 for metric in self.compression_metric_names:
-                    values = compute_compression_metric(
+                    _score = compute_compression_metric(
                         c_x1=c_x1,
                         c_x2=c_x2,
                         c_x1x2=c_x1x2,
@@ -163,17 +158,12 @@ class CompressionMatrix:
                         metric=metric
                     )
                     
-                    values = max(values, 1e-12)
-                    sigmas.append(values)
+                    sigmas.append(_score)
 
             return sigmas
         sigmas = np.array(
             list(map(_compute, samples))
         ).flatten()
-        
-        # sigmas = np.abs(sigmas)
-    
-        # sigmas[sigmas == 0] = 1e-12
         
         sigma = hmean(sigmas)
         
@@ -210,8 +200,8 @@ class CompressionMatrix:
 
             for metric in self.compression_metric_names:
                 metric_index = self.compression_metrics[metric]
-
-                matrix_values[compressor_index, metric_index] = compute_compression_metric(
+                
+                _score = compute_compression_metric(
                     c_x1=c_x1,
                     c_x2=c_x2,
                     c_x1x2=c_x1x2,
@@ -219,6 +209,8 @@ class CompressionMatrix:
                     metric=metric
                 )
 
+                matrix_values[compressor_index, metric_index] = _score
+            
         nan_mask = ~np.isnan(matrix_values)
 
         result = matrix_values[nan_mask].reshape(

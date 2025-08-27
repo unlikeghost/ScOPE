@@ -7,6 +7,7 @@
 
 import bz2
 import zlib
+import gzip
 from enum import Enum
 from zstandard import ZstdCompressor
 from abc import ABC, abstractmethod
@@ -16,6 +17,7 @@ from collections import Counter
 
 class CompressorType(Enum):
     """Enumeration of supported compression algorithms."""
+    GZIP= "gzip"
     BZ2 = "bz2"
     ZLIB = "zlib"
     ZSTD = "zstd"
@@ -27,9 +29,7 @@ class CompressorType(Enum):
 class BaseCompressor(ABC):
     """Abstract base class for all compression algorithms."""
 
-    def __init__(self, compressor_name: str, compression_level: int = 9, 
-                 min_size_threshold: Optional[int] = None, 
-                 padding_method: Optional[str] = None):
+    def __init__(self, compressor_name: str, compression_level: int = 9,min_size_threshold: Optional[int] = None):
         """Initialize the base compressor with specified parameters.
 
         Args:
@@ -37,20 +37,18 @@ class BaseCompressor(ABC):
             compression_level: Compression level (1-9, where 9 is maximum)
             min_size_threshold: Minimum size for effective compression
             padding_method: Method for padding small sequences ('zeros' or 'repeat')
-
+        
         Raises:
             ValueError: If compression level is not between 1-9 or invalid padding method
         """
         if not 1 <= compression_level <= 9:
             raise ValueError("Compression level must be between 1 and 9")
-
-        if min_size_threshold and min_size_threshold > 0:
-            if padding_method and padding_method not in {"zeros", "repeat"}:
-                raise ValueError("padding_method must be 'zeros' or 'repeat'")
-            padding_method = padding_method or 'zeros'
-
-        self._min_size_threshold = min_size_threshold or 0
-        self._padding_method: Optional[str] = padding_method
+        
+        if min_size_threshold and min_size_threshold < 0:
+            raise ValueError("min_sise_treshold must be a positive number")
+        
+        self._use_paddig: bool = True if min_size_threshold and min_size_threshold > 0 else False
+        self._min_size_threshold: int = min_size_threshold or 0
         self._compressor_name: str = compressor_name
         self._compression_level: int = compression_level
     
@@ -110,83 +108,95 @@ class BaseCompressor(ABC):
     def _apply_padding(self, sequence: bytes) -> bytes:
         """Apply padding to sequence if it's below minimum threshold."""
         if not self._should_pad_sequence(sequence):
-            return sequence
-        
+                return sequence
+            
         original_length = len(sequence)
         if original_length == 0:
             raise ValueError("Sequence must have at least 1 byte")
         
         padding_needed = self._min_size_threshold - original_length
         
-        if self._padding_method == "zeros":
-            return sequence + (b'\x00' * padding_needed)
-        elif self._padding_method == "repeat":
-            full_repeats = padding_needed // original_length
-            remainder = padding_needed % original_length
-            return sequence + (sequence * full_repeats) + sequence[:remainder]
-        else:
-            return sequence
-
-
+        full_repeats = padding_needed // original_length
+        remainder = padding_needed % original_length
+        
+        repeated_sequence = sequence * full_repeats
+        
+        partial_sequence = sequence[:remainder]
+        
+        new_sequence = sequence + repeated_sequence + partial_sequence
+        
+        return new_sequence
 class Bz2Compressor(BaseCompressor):
     """BZ2 compression algorithm implementation."""
     
-    def __init__(self, compression_level: int = 9, min_size_threshold: Optional[int] = None):
+    def __init__(self, compression_level: int = 9):
         super().__init__(
             compressor_name="bz2",
             compression_level=compression_level,
-            min_size_threshold=min_size_threshold
+            min_size_threshold=120
         )
 
     def compress(self, sequence: bytes) -> bytes:
         """Compress using BZ2 algorithm, removing header for size optimization."""
-        return bz2.compress(sequence, compresslevel=self._compression_level)[15:]
+        # return bz2.compress(sequence, compresslevel=self._compression_level)[15:]
+        return bz2.compress(sequence, compresslevel=self._compression_level)
         
         
 class ZlibCompressor(BaseCompressor):
     """ZLIB compression algorithm implementation."""
     
-    def __init__(self, compression_level: int = 9, min_size_threshold: Optional[int] = None):
+    def __init__(self, compression_level: int = 9):
         super().__init__(
             compressor_name="zlib",
             compression_level=compression_level,
-            min_size_threshold=min_size_threshold
+            min_size_threshold=50
         )
 
     def compress(self, sequence: bytes) -> bytes:
         """Compress using ZLIB algorithm with raw deflate (no headers)."""
-        return zlib.compress(sequence, level=self._compression_level, wbits=-15)
+        # return zlib.compress(sequence, level=self._compression_level, wbits=-15)
+        return zlib.compress(sequence, level=self._compression_level)
     
     
 class ZStandardCompressor(BaseCompressor):
     """Zstandard compression algorithm implementation."""
     
-    def __init__(self, compression_level: int = 9, min_size_threshold: Optional[int] = None):
+    def __init__(self, compression_level: int = 9,):
         super().__init__(
             compressor_name="zstandard",
             compression_level=compression_level,
-            min_size_threshold=min_size_threshold
+            min_size_threshold=50
         )
     
     def compress(self, sequence: bytes) -> bytes:
         """Compress using Zstandard algorithm with minimal overhead."""
-        compressor = ZstdCompressor(
-            level=self._compression_level, 
-            write_content_size=False, 
-            write_checksum=False, 
-            write_dict_id=False
-        )
+        compressor = ZstdCompressor(level=self._compression_level, )
         return compressor.compress(sequence)
+
+
+class GZipCompressor(BaseCompressor):
+    """gzip compression algorithm implementation."""
+    
+    def __init__(self, compression_level: int = 9,):
+        super().__init__(
+            compressor_name="gzip",
+            compression_level=compression_level,
+            min_size_threshold=60
+        )
+    
+    def compress(self, sequence: bytes) -> bytes:
+        """Compress using Zstandard algorithm with minimal overhead."""
+        return gzip.compress(sequence)
 
 
 class RLECompressor(BaseCompressor):
     """Run Length Encoding - basic compression for repetitive data."""
     
-    def __init__(self, compression_level: int = 1, min_size_threshold: Optional[int] = None):
+    def __init__(self, compression_level: int = 1,):
         super().__init__(
             compressor_name="rle",
             compression_level=compression_level,
-            min_size_threshold=min_size_threshold
+            min_size_threshold=20
         )
 
     def compress(self, sequence: bytes) -> bytes:
@@ -214,11 +224,11 @@ class RLECompressor(BaseCompressor):
 class HuffmanCompressor(BaseCompressor):
     """Simplified Huffman Coding - frequency-based compression."""
     
-    def __init__(self, compression_level: int = 1, min_size_threshold: Optional[int] = None):
+    def __init__(self, compression_level: int = 1,):
         super().__init__(
             compressor_name="huffman",
             compression_level=compression_level,
-            min_size_threshold=min_size_threshold
+            min_size_threshold=30
         )
 
     def compress(self, sequence: bytes) -> bytes:
@@ -279,11 +289,11 @@ class HuffmanCompressor(BaseCompressor):
 class LZ77Compressor(BaseCompressor):
     """LZ77 algorithm with configurable window size."""
     
-    def __init__(self, compression_level: int = 1, min_size_threshold: Optional[int] = None):
+    def __init__(self, compression_level: int = 1,):
         super().__init__(
             compressor_name="lz77",
             compression_level=compression_level,
-            min_size_threshold=min_size_threshold
+            min_size_threshold=45
         )
         # Window size scales with compression level
         self.window_size = 10 + (compression_level * 2)  # 12-28
@@ -339,6 +349,7 @@ class LZ77Compressor(BaseCompressor):
 
 # Strategy pattern mapping
 COMPRESSOR_STRATEGIES = {
+    CompressorType.GZIP: GZipCompressor,
     CompressorType.BZ2: Bz2Compressor,
     CompressorType.ZLIB: ZlibCompressor,
     CompressorType.ZSTD: ZStandardCompressor,
@@ -351,15 +362,13 @@ COMPRESSOR_STRATEGIES = {
 def get_compressor(
     name: Union[str, CompressorType],
     compression_level: int = 9,
-    min_size_threshold: Optional[int] = None
+
 ) -> BaseCompressor:
     """Factory function to get a specific compressor instance.
     
     Args:
         name: Compressor name ('rle', 'huffman', 'lz77', 'zlib', 'bz2', 'zstd')
-        compression_level: Compression level (1-9)
-        min_size_threshold: Minimum size for padding
-    
+        compression_level: Compression level (1-9)    
     Returns:
         Compressor instance
         
@@ -383,16 +392,14 @@ def get_compressor(
     
     compressor_class = COMPRESSOR_STRATEGIES[compressor_enum]
     return compressor_class(
-        compression_level=compression_level,
-        min_size_threshold=min_size_threshold
+        compression_level=compression_level
     )
 
 
 def compute_compression(
     sequence: str, 
     compressor: str, 
-    compression_level: int, 
-    min_size_threshold: Optional[int] = None
+    compression_level: int,
 ) -> bytes:
     """Compute compression for a given sequence using specified compressor.
     
@@ -400,7 +407,6 @@ def compute_compression(
         sequence: Input string to compress
         compressor: Name of the compressor to use
         compression_level: Compression level (1-9)
-        min_size_threshold: Minimum size threshold for padding
         
     Returns:
         Compressed data as bytes
@@ -408,7 +414,6 @@ def compute_compression(
     compressor_instance = get_compressor(
         name=compressor.lower(),
         compression_level=compression_level,
-        min_size_threshold=min_size_threshold
     )
     
     return compressor_instance(sequence)
