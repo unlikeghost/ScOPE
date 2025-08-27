@@ -34,17 +34,31 @@ random.seed(RANDOM_SEED)
 # -------------------
 def preprocess_smiles(smiles: str) -> str | None:
     """Canonicalize and clean a SMILES string. Returns None if invalid."""
+    
     try:
         mol = Chem.MolFromSmiles(smiles)
         if mol is None:
             return None
 
-        # Keep largest fragment if multiple parts
-        fragments = Chem.GetMolFrags(mol, asMols=True)
-        mol = max(fragments, key=lambda m: m.GetNumAtoms())
+        # Mantener el fragmento más grande
+        # fragments = Chem.GetMolFrags(mol, asMols=True)
+        # mol = max(fragments, key=lambda m: m.GetNumAtoms())
 
-        # Canonical SMILES
-        return Chem.MolToSmiles(mol, canonical=True, isomericSmiles=False)
+        representations = [
+            Chem.MolToSmiles(mol, canonical=False, isomericSmiles=True),
+            Chem.MolToSmiles(mol, canonical=True, isomericSmiles=False),  # canónico básico
+            Chem.MolToSmiles(mol, allHsExplicit=True),                    # con H explícitos
+            Chem.MolToSmiles(mol, rootedAtAtom=0),                        # enraizado
+        ]
+
+        # Quitar duplicados y unir
+        unique_reps = list(set(representations))
+        combined = " |JOIN| ".join(unique_reps)
+        
+        # canonical = Chem.MolToSmiles(mol, canonical=False, isomericSmiles=False)
+        
+        return combined
+        
     except Exception:
         return None
 
@@ -52,7 +66,7 @@ def preprocess_smiles(smiles: str) -> str | None:
 # Load Clintox dataset (raw SMILES)
 # -------------------
 tasks, datasets, _ = dc.molnet.load_clintox(
-    splitter="scaffold", reload=True, featurizer=dc.feat.DummyFeaturizer()
+    splitter="stratified", reload=True, featurizer=dc.feat.DummyFeaturizer()
 )
 train_dataset, valid_dataset, test_dataset = datasets
 

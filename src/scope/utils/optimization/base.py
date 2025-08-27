@@ -2,7 +2,6 @@ import os
 import pickle
 import json
 import hashlib
-import warnings
 import numpy as np
 from datetime import datetime
 from typing import List, Dict, Optional, Any, Union
@@ -34,7 +33,9 @@ class ScOPEOptimizer(ABC):
         
         self.parameter_space = parameter_space or ParameterSpace()
         
-        self.n_jobs = max(1, os.cpu_count() - free_cpu)
+        _os_cpu = os.cpu_count() or 0
+        
+        self.n_jobs = max(1, _os_cpu - free_cpu)
         self.random_seed: int = random_seed
         self.cv_folds = cv_folds
         self.study_date = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -69,20 +70,7 @@ class ScOPEOptimizer(ABC):
     def _make_cache_key(self, model):
         """Create cache key for model parameters."""
         # Use the model's to_dict method if available
-        try:
-            model_params = model.to_dict()
-        except:
-            # Fallback to manual parameter extraction
-            model_params = {
-                'model_type': getattr(model, '_model_type', 'unknown'),
-                'aggregation_method': getattr(model, '_aggregation_method', None),
-                'compressor_names': getattr(model, '_compressor_names', []),
-                'compression_metric_names': getattr(model, '_compression_metric_names', []),
-                'compression_level': getattr(model, '_compression_level', 9),
-                'join_string': getattr(model, '_join_string', ''),
-                'get_sigma': getattr(model, '_get_sigma', True),
-                'qval': getattr(model, '_qval', -1),
-            }
+        model_params = model.to_dict()
         
         key_str = json.dumps(model_params, sort_keys=True, default=str)
         return hashlib.md5(key_str.encode()).hexdigest()
@@ -101,7 +89,6 @@ class ScOPEOptimizer(ABC):
         print(f"  • Compressor combinations ({len(self.parameter_space.compressor_names_options)})")
         print(f"  • Compression metric combinations ({len(self.parameter_space.compression_metric_names_options)})")
         print(f"  • Compression levels range: {self.parameter_space.compression_levels_range}") 
-        print(f"  • QVal range: {self.parameter_space.qval_range}")
         print(f"  • Join string options ({len(self.parameter_space.concat_value_options)}): {[repr(s) for s in self.parameter_space.concat_value_options]}")
         print(f"  • Get sigma options: {self.parameter_space.get_sigma_options}")
         print(f"  • Model types: {self.parameter_space.model_types_options}")
@@ -133,19 +120,18 @@ class ScOPEOptimizer(ABC):
         
         # Handle aggregation_method None properly
         aggregation_method = params.get('aggregation_method')
-        if aggregation_method == 'None' or aggregation_method == 'null':
+        if aggregation_method == 'None' or aggregation_method == 'null' or aggregation_method == '':
             aggregation_method = None
         
         # Base parameters for ScOPE
         base_params = {
             'model_type': params['model_type'],
             'aggregation_method': aggregation_method,
-            'compressor_names': compressor_names,  # Note: uses 'compressors_names' not 'compressor_names'
+            'compressor_names': compressor_names,
             'compression_metric_names': compression_metric_names,
             'compression_level': params['compression_level'],
-            'join_string': params['join_string'],  # Updated from concat_value
+            'join_string': params['join_string'],
             'get_sigma': params['get_sigma'],
-            'qval': params['qval'],
         }
         
         # Model-specific parameters - handle None and invalid types correctly
@@ -174,6 +160,11 @@ class ScOPEOptimizer(ABC):
     
     def suggest_categorical_params(self, trial) -> Dict[str, Any]:
         """Suggest categorical parameters."""
+        aggregation_method = trial.suggest_categorical(
+            'aggregation_method',
+            self.parameter_space.aggregation_method_options
+        )
+        
         return {
             'join_string': trial.suggest_categorical(
                 'join_string', 
@@ -183,12 +174,10 @@ class ScOPEOptimizer(ABC):
                 'model_type',
                 self.parameter_space.model_types_options
             ),
-            'aggregation_method': trial.suggest_categorical(
-                'aggregation_method',
-                self.parameter_space.aggregation_method_options
-            )
+            # Convertir string vacío a None
+            'aggregation_method': None if aggregation_method == '' else aggregation_method
         }
-    
+        
     def suggest_boolean_params(self, trial) -> Dict[str, Any]:
         """Suggest boolean parameters."""
         return {
@@ -205,10 +194,6 @@ class ScOPEOptimizer(ABC):
                 'compression_level',
                 *self.parameter_space.compression_levels_range
             ),
-            'qval': trial.suggest_int(
-                'qval',
-                *self.parameter_space.qval_range
-            )
         }
     
     def suggest_compressor_and_metric_params(self, trial) -> Dict[str, Any]:
@@ -225,25 +210,28 @@ class ScOPEOptimizer(ABC):
         }
     
     def suggest_model_specific_params(self, trial, model_type: str) -> Dict[str, Any]:
-        """Suggest model-specific parameters ONLY for the selected model type."""        
-        params = {}
+            """Suggest model-specific parameters ONLY for the selected model type."""        
+            params = {}
+                    
+            if model_type == "ot":
+                # ONLY for OT: matching metric
+                matching_metric = trial.suggest_categorical(
+                    'matching_metric',
+                    self.parameter_space.matching_metrics
+                )
+                params['matching_metric'] = None if matching_metric == '' else matching_metric
                 
-        if model_type == "ot":
-            # ONLY for OT: matching metric
-            params['matching_metric'] = trial.suggest_categorical(
-                'matching_metric',
-                self.parameter_space.matching_metrics
-            )
+            elif model_type == "pd":
+                # ONLY for PD: distance metric
+                distance_metric = trial.suggest_categorical(
+                    'distance_metric',
+                    self.parameter_space.distance_metrics
+                )
+                if distance_metric != '':
+                    params['distance_metric'] = distance_metric
             
-        elif model_type == "pd":
-            # ONLY for PD: distance metric
-            params['distance_metric'] = trial.suggest_categorical(
-                'distance_metric',
-                self.parameter_space.distance_metrics
-            )
-        
-        return params
-    
+            return params
+            
     def suggest_all_params(self, trial) -> Dict[str, Any]:
         """Combine all parameter suggestions."""
         params = {}
@@ -261,7 +249,7 @@ class ScOPEOptimizer(ABC):
         params.update(self.suggest_compressor_and_metric_params(trial))
         
         # Model-specific parameters
-        params.update(self.suggest_model_specific_params(trial, params.get('model_type')))
+        params.update(self.suggest_model_specific_params(trial, params['model_type']))
 
         return params
     
@@ -315,7 +303,7 @@ class ScOPEOptimizer(ABC):
                         predictions = model(samples=sample, kw_samples=kw_sample)
                         # Extract the first prediction from the list
                         if isinstance(predictions, list) and len(predictions) > 0:
-                            prediction = predictions[0]
+                            prediction: dict = predictions[0]
                         else:
                             raise ValueError("Expected list of predictions")
                         
@@ -327,7 +315,7 @@ class ScOPEOptimizer(ABC):
                             predicted_class = 0
                         
                         # Extract probabilities (always available)
-                        probs = prediction.get('probas', {})
+                        probs: dict = prediction.get('probas', {})
                         
                         # Ensure probabilities are ordered consistently
                         probs = OrderedDict(sorted(probs.items()))
@@ -529,15 +517,15 @@ class ScOPEOptimizer(ABC):
 
     def print_target_metric_info(self):
         """Print information about the configured target metric."""
-        print(f"Target metric configuration:")
+        print("Target metric configuration:")
         if self.is_combined:
-            print(f"  Type: Combined metric")
-            print(f"  Weights:")
+            print("  Type: Combined metric")
+            print("  Weights:")
             for metric, weight in self.target_metric_weights.items():
                 print(f"    {metric}: {weight:.3f}")
             print(f"  Optimization direction: {self.get_optimization_direction()}")
         else:
-            print(f"  Type: Single metric")
+            print("  Type: Single metric")
             print(f"  Metric: {self.target_metric_name}")
             print(f"  Optimization direction: {self.get_optimization_direction()}")
 

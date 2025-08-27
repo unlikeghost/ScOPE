@@ -17,7 +17,6 @@ class ScOPE:
                  compression_level: int = 9,
                  join_string: str = '',
                  get_sigma: bool = True,
-                 qval: Optional[int] = -1,
                  **model_kwargs
                  ):
         
@@ -33,7 +32,6 @@ class ScOPE:
             compression_level=compression_level,
             join_string=join_string,
             get_sigma=get_sigma,
-            qval=qval
         )
         
         self._model_type = model_type
@@ -47,7 +45,6 @@ class ScOPE:
         self._compression_level = compression_level
         self._join_string = join_string
         self._get_sigma = get_sigma
-        self._qval = qval
     
     def _coerce_kwargs_to_serializable(self, kwargs: dict) -> dict:
         try:

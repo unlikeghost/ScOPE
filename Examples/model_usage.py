@@ -23,7 +23,7 @@ test_sample_pos = "Fantástica película que combina acción emocionante con mom
 
 model = ScOPE(
     model_type='pd',
-    aggregation_method='gmean',
+    aggregation_method='average',
     distance_metric='squared_euclidean',
     compressor_names=['bz2', 'zlib'],
     compression_metric_names=['cd'],

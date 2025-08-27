@@ -4,34 +4,22 @@
     Dissimilarity Compression Metrics
     Jesus Alan Heernandez Galvan
 """
-import warnings
 from typing import Optional
 
 
 def _safe_division(numerator: float, denominator: float, error_msg: str = "Division by zero") -> float:
     """Safely perform division with zero denominator check."""
     if denominator == 0:
-        raise ZeroDivisionError(error_msg)
+        return numerator / 1e-8
+        
     return numerator / denominator
-
-
-def _handle_negative(score: float, metric_name: str) -> float:
-    """Handle negative values using absolute value."""
-    if score < 0:
-        warnings.warn(
-            f"Negative {metric_name} = {score:.4f} detected. Using absolute value. "
-            f"Consider preprocess your strings.",
-            category=RuntimeWarning
-        )
-        return abs(score)
-    return score
 
 
 def ncd(c_x1: float, c_x2: float, c_x1x2: float, c_x2x1: Optional[float] = None) -> float:
     """Normalized Compression Distance"""
     _ = c_x2x1
     
-    numerator = _handle_negative(c_x1x2 - min(c_x1, c_x2), "NCD numerator")
+    numerator = c_x1x2 - min(c_x1, c_x2)
     denominator = max(c_x1, c_x2)
     
     return _safe_division(
@@ -70,8 +58,8 @@ def cd(c_x1: float, c_x2: float, c_x1x2: float, c_x2x1: float) -> float:
 def ucd(c_x1: float, c_x2: float, c_x1x2: float, c_x2x1: float) -> float:
     """Universal Compression Dissimilarity"""
     numerator = max(
-        _handle_negative(c_x1x2 - c_x1, "UCD term1"),
-        _handle_negative(c_x2x1 - c_x2, "UCD term2")
+       c_x1x2 - c_x1,
+        c_x2x1 - c_x2,
     )
     denominator = max(c_x1, c_x2)
     
@@ -89,7 +77,7 @@ def ncc(c_x1: float, c_x2: float, c_x1x2: Optional[float] = None, c_x2x1: Option
     if c_x2x1 is None:
         raise ValueError("NCC requires c_x2x1 parameter")
     
-    numerator = _handle_negative(c_x2x1 - c_x2, "NCC conditional")  # C(x1|x2) approximation
+    numerator = c_x2x1 - c_x2
     denominator = c_x1
     
     return _safe_division(
@@ -102,8 +90,8 @@ def ncc(c_x1: float, c_x2: float, c_x1x2: Optional[float] = None, c_x2x1: Option
 def nccd(c_x1: float, c_x2: float, c_x1x2: float, c_x2x1: float) -> float:
     """Normalized Conditional Compression Dissimilarity"""
     numerator = max(
-        _handle_negative(c_x2x1 - c_x2, "NCCD conditional_x1_x2"),  # C(x1|x2) approximation
-        _handle_negative(c_x1x2 - c_x1, "NCCD conditional_x2_x1")   # C(x2|x1) approximation
+        c_x2x1 - c_x2,  # C(x1|x2) approximation
+        c_x1x2 - c_x1   # C(x2|x1) approximation
     )
     denominator = max(c_x1, c_x2)
     

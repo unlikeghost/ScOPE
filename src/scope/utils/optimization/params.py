@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Tuple
 from dataclasses import dataclass, field
 from itertools import chain, combinations
 
@@ -25,7 +25,8 @@ class ParameterSpace:
     )
     
     concat_value_options: List[str] = field(
-        default_factory= lambda: ["|||SEP_SAFE_DELIM_SEP|||"]
+        default_factory= lambda: [' ', '\n']
+        # default_factory= lambda: ["|||SEP_SAFE_DELIM_SEP|||"]
     )
     
     model_types_options: List[str] = field(
@@ -33,16 +34,12 @@ class ParameterSpace:
     )
     
     aggregation_method_options: List[str] = field(
-        default_factory= lambda: ['mean', 'median', 'sum', 'gmean', None]
+        default_factory= lambda: ['mean', 'median', 'sum', 'average', 'gmean', '']
     )
     
     # Enteros
-    compression_levels_range: List[int] = field(
+    compression_levels_range: Tuple[int] = field(
         default_factory=lambda: (1, 9)
-    )
-    
-    qval_range: List[int] = field(
-        default_factory=lambda: (-1, 8)
     )
 
     # Booleanos
@@ -52,7 +49,7 @@ class ParameterSpace:
 
     # Específicos por tipo de modelo
     matching_metrics: List[str] = field(
-        default_factory=lambda: ["jaccard", "dice", "overlap", None]
+        default_factory=lambda: ["jaccard", "dice", "overlap", '']
     )
     
     distance_metrics: List[str] = field(

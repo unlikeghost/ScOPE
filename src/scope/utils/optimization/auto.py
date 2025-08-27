@@ -1,4 +1,5 @@
 import os
+import warnings
 import pandas as pd
 from typing import List, Dict, Optional, Any, Union
 
@@ -8,6 +9,7 @@ import optunahub
 from .base import ScOPEOptimizer
 from .params import ParameterSpace
 
+warnings.filterwarnings("ignore", category=optuna.exceptions.ExperimentalWarning)
 
 class ScOPEOptimizerAuto(ScOPEOptimizer):
     """Automatic sampler selection optimization for ScOPE models using AutoSampler."""
@@ -22,7 +24,7 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
                  n_trials: int = 75,  # Balanced for auto-selection
                  target_metric: Union[str, Dict[str, float]] = 'auc_roc',
                  use_cache: bool = True,
-                 constraints_func: Optional[callable] = None
+                 # constraints_func: Optional[callable] = None
                  ):
         """Initialize the AutoSampler optimizer
         
@@ -42,14 +44,7 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             use_cache=use_cache
         )
         
-        self.constraints_func = constraints_func
-        self.auto_sampler_module = None
-        self.sampler_history = []  # Track which samplers were used
-        
-        os.makedirs(self.output_path, exist_ok=True)
-    
-    def _load_auto_sampler(self):
-        """Load AutoSampler from OptunaHub"""
+        # self.constraints_func = constraints_func
         try:
             self.auto_sampler_module = optunahub.load_module("samplers/auto_sampler")
             print("✓ AutoSampler loaded successfully from OptunaHub")
@@ -57,6 +52,10 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             print(f"❌ Failed to load AutoSampler: {e}")
             print("💡 Make sure you have installed: pip install optunahub cmaes scipy torch")
             raise ImportError("AutoSampler dependencies not available. Please install: pip install optunahub cmaes scipy torch")
+    
+        self.sampler_history = []  # Track which samplers were used
+        
+        os.makedirs(self.output_path, exist_ok=True)
     
     def optimize(self,
                 X_validation: List[str],
@@ -69,12 +68,10 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
         print(f"Classes: {sorted(set(y_validation))}")
         print(f"Trials: {self.n_trials}")
         print(f"CV Folds: {self.cv_folds}")
-        print(f"Constraints function: {'Yes' if self.constraints_func else 'None'}")
+        # print(f"Constraints function: {'Yes' if self.constraints_func else 'None'}")
         print()
         
-        # Load AutoSampler
-        self._load_auto_sampler()
-        
+                
         self.validate_data(y_validation)
         self.validate_optimization_setup()
         
@@ -92,18 +89,6 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             X_validation, y_validation, kw_samples_validation
         )
         
-        # Wrap objective function if constraints are provided
-        if self.constraints_func:
-            original_objective = objective_func
-            def constrained_objective(trial):
-                result = original_objective(trial)
-                if not self.constraints_func(trial):
-                    # Return a penalty value if constraints not satisfied
-                    penalty = float('inf') if self.get_optimization_direction() == 'minimize' else float('-inf')
-                    return penalty
-                return result
-            objective_func = constrained_objective
-        
         direction = self.get_optimization_direction()
         
         # Configure AutoSampler
@@ -111,8 +96,8 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             'seed': self.random_seed,
         }
         
-        if self.constraints_func:
-            auto_sampler_kwargs['constraints_func'] = self.constraints_func
+        # if self.constraints_func:
+        #     auto_sampler_kwargs['constraints_func'] = self.constraints_func
         
         # Configure Optuna study with AutoSampler
         self.study = optuna.create_study(
@@ -163,7 +148,7 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
         print(f"Compression metrics: {compression_metric_names}")
         
         if is_ensemble:
-            print(f"Ensemble configuration detected")
+            print("Ensemble configuration detected")
         
         aggregation_method = self.best_params.get('aggregation_method')
         if aggregation_method is not None:
@@ -201,7 +186,7 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
         if not self.study or not self.study.trials:
             return
         
-        print(f"\n🤖 AutoSampler Analysis:")
+        print("\n🤖 AutoSampler Analysis:")
         print(f"   Total samplers used: {len(set(self.sampler_history))}")
         print(f"   Sampler transitions: {len(self.sampler_history) - 1}")
         
@@ -250,16 +235,16 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
         print(f"Failed trials: {failed_trials}")
         
         # AutoSampler specific analysis
-        print(f"\nAutoSampler Configuration:")
+        print("\nAutoSampler Configuration:")
         print(f"  • Sampler: {type(self.study.sampler).__name__}")
-        print(f"  • Constraints: {'Yes' if self.constraints_func else 'None'}")
-        print(f"  • Adaptive strategy: Automatic (GPSampler + TPESampler)")
+        # print(f"  • Constraints: {'Yes' if self.constraints_func else 'None'}")
+        print("  • Adaptive strategy: Automatic (GPSampler + TPESampler)")
         
         # Performance evolution analysis
         if len(self.study.trials) >= 10:
             values = [t.value for t in self.study.trials if t.value is not None]
             if values:
-                print(f"\nPerformance Evolution:")
+                print("\nPerformance Evolution:")
                 
                 # Divide into phases
                 phase_size = len(values) // 3
@@ -302,7 +287,7 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
                 else:
                     individual_trials.append(row)
             
-            print(f"\nEnsemble vs Individual Analysis:")
+            print("\nEnsemble vs Individual Analysis:")
             print(f"  Ensemble trials: {len(ensemble_trials)}")
             print(f"  Individual trials: {len(individual_trials)}")
             
@@ -356,8 +341,7 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             print("\nTop 5 configurations (AutoSampler discoveries):")
             columns_to_show = ['value', 'params_compressor_names', 'params_compression_metric_names', 
                               'params_model_type', 'params_get_sigma', 'params_aggregation_method',
-                              'params_join_string', 'params_compression_level',
-                              'params_qval']
+                              'params_join_string', 'params_compression_level']
             
             # Add model-specific columns if they exist
             model_specific_columns = []
@@ -394,15 +378,15 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             f.write(f"Study name: {self.study_name}\n")
             f.write(f"Study date: {self.study_date}\n")
             f.write(f"Output path: {self.output_path}\n")
-            f.write(f"Sampler: AutoSampler (adaptive algorithm selection)\n\n")
+            f.write("Sampler: AutoSampler (adaptive algorithm selection)\n\n")
             
             # AutoSampler configuration
             f.write("AUTOSAMPLER CONFIGURATION:\n")
             f.write("-" * 30 + "\n")
-            f.write(f"Adaptive strategy: GPSampler (early) + TPESampler (categorical) + dynamic switching\n")
-            f.write(f"Constraints function: {'Yes' if self.constraints_func else 'None'}\n")
+            f.write("Adaptive strategy: GPSampler (early) + TPESampler (categorical) + dynamic switching\n")
+            # f.write(f"Constraints function: {'Yes' if self.constraints_func else 'None'}\n")
             f.write(f"Random seed: {self.random_seed}\n")
-            f.write(f"Automatic algorithm selection: Enabled\n\n")
+            f.write("Automatic algorithm selection: Enabled\n\n")
             
             # Study configuration
             f.write("OPTIMIZATION CONFIGURATION:\n")
@@ -439,7 +423,6 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             f.write(f"Compressor combinations: {len(self.parameter_space.compressor_names_options)}\n")
             f.write(f"Compression metric combinations: {len(self.parameter_space.compression_metric_names_options)}\n")
             f.write(f"Compression levels range: {self.parameter_space.compression_levels_range}\n")
-            f.write(f"QVal range: {self.parameter_space.qval_range}\n")
             f.write(f"Join string options: {self.parameter_space.concat_value_options}\n")
             f.write(f"Get sigma options: {self.parameter_space.get_sigma_options}\n")
             f.write(f"Model types: {self.parameter_space.model_types_options}\n")
@@ -496,7 +479,7 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             improvement = baseline_best - auto_best  
             better = auto_best < baseline_best
         
-        print(f"\n📊 Comparison Results:")
+        print("\n📊 Comparison Results:")
         print(f"   AutoSampler best: {auto_best:.4f}")
         print(f"   {type(baseline_optimizer).__name__} best: {baseline_best:.4f}")
         print(f"   Improvement: {improvement:.4f}")

@@ -14,7 +14,8 @@ class _BasePredictor(ABC):
         "mean": lambda data: np.mean(data, axis=0),
         "median": lambda data: np.median(data, axis=0),
         "sum": lambda data: np.sum(data, axis=0),
-        "gmean": lambda data: gmean(data)
+        "average": lambda data: np.average(data, axis=0),
+        "gmean": lambda data: gmean(data, axis=0)
     }
     
     def __init__(self,
@@ -31,7 +32,9 @@ class _BasePredictor(ABC):
     
     @staticmethod
     def __compute_gaussian_function__(x, sigma):
-        return np.exp(-0.5 * np.square((x / sigma)))
+        sigma_safe = max(sigma, 1e-8) if sigma > 0 else 1e-8
+
+        return np.exp(-0.5 * np.square((x / sigma_safe)))
     
     def __compute_aggregated_prototype__(self, data: np.ndarray) -> np.ndarray:
         """Compute prototype using specified aggregation method"""

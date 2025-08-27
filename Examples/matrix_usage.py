@@ -1,11 +1,9 @@
 from scope.compression import CompressionMatrix
 
 cm = CompressionMatrix(
-    compressor_names=['bz2', 'zlib'],
-    compression_metric_names=['ncd', 'cdm'],
+    compressor_names=['lz77'],
+    compression_metric_names=['ncc'],
     join_string=' ',
-    compression_level=9,
-    min_size_threshold=50
 )
 
 test_samples = {
@@ -13,7 +11,7 @@ test_samples = {
     1: ['Adios', 'adioz']
 }
 
-test_sample = 'Hola'
+test_sample = 'ola'
 
 
 results = cm(
