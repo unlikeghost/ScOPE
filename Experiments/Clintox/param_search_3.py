@@ -26,7 +26,7 @@ LABEL_COLUMN = "ct_tox"
 RANDOM_SEED = 42
 
 RESULTS_PATH = os.path.join("results")
-ANALYSIS_RESULTS_PATH = os.path.join(RESULTS_PATH, str(TEST_SAMPLES), "Optimization")
+ANALYSIS_RESULTS_PATH = os.path.join(RESULTS_PATH)
 EVALUATION_RESULTS_PATH = os.path.join(RESULTS_PATH, str(TEST_SAMPLES), "Evaluation")
 
 np.random.seed(RANDOM_SEED)
