@@ -88,14 +88,7 @@ class CompressionMatrix:
         )
         
         c_sequence = len(compressed_sequence)
-        
-        if c_sequence >= len(sequence): 
-            warnings.warn(
-                f"Expected compressed size <= original, got {c_sequence} > {len(sequence)} "
-                f"with compressor {compressor}. Compression ineffective.",
-                category=UserWarning
-            )
-            
+
         return c_sequence
     
     def __compute_dissimilarity_metric__(self, x1: str, x2: str, compressor: str, metric: str) -> float:
