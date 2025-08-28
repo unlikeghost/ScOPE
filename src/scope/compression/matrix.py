@@ -8,11 +8,10 @@ import warnings
 import numpy as np
 from copy import deepcopy
 from itertools import product
-from functools import lru_cache
 from scipy.stats.mstats import hmean
 from typing import Union, List, Dict, Tuple
 
-from .compressors import compute_compression, get_compressor
+from .compressors import compute_compression
 from .dissimilarity import compute_compression_metric
 
 
@@ -22,11 +21,11 @@ class CompressionMatrix:
     compressors = {
         'bz2': 0,
         'zlib': 1,
-        'zstd': 2,
-        'rle': 3,
-        'huffman': 4,
-        'lz77': 5,
-        'gzip': 6
+        'rle': 2,
+        'lz77': 3,
+        'gzip': 4,
+        'smilez': 5,
+        'smaz': 6
     }
 
     compression_metrics = {
@@ -77,26 +76,6 @@ class CompressionMatrix:
         self.compression_metric_names = set(compression_metric_names)
         self.get_sigma = get_sigma
 
-    @lru_cache(maxsize=None)
-    def __sequence_concatenation__(self, x1: Union[str, bytes], x2: Union[str, bytes]) -> bytes:
-        
-        x1 = x1 if isinstance(x1, bytes) else x1.encode('utf-8')
-        
-        x2 = x2 if isinstance(x2, bytes) else x2.encode('utf-8')
-        
-        return x1 + self.join_string.encode('utf-8') + x2
-    
-    @lru_cache(maxsize=None)
-    def __apply_threshold_padding__(self, sequence: str, compressor: str) -> bytes:
-        """Aplica padding al string si está por debajo del threshold del compresor"""
-        compressor_instance = get_compressor(compressor, self.compression_level)
-    
-        sequence_bytes = sequence.encode('utf-8')
-        padded_sequence_bytes = compressor_instance._apply_padding(sequence_bytes)
-                
-        return padded_sequence_bytes
-    
-    @lru_cache(maxsize=None)
     def __get_compression_size__(self, sequence: Union[str, bytes], compressor: str) -> int:
         """Comprime un string y retorna solo el tamaño"""
         if len(sequence) == 0:
@@ -109,22 +88,25 @@ class CompressionMatrix:
         )
         
         c_sequence = len(compressed_sequence)
-                
-        return min(len(sequence), c_sequence)
+        
+        if c_sequence >= len(sequence): 
+            warnings.warn(
+                f"Expected compressed size <= original, got {c_sequence} > {len(sequence)} "
+                f"with compressor {compressor}. Compression ineffective.",
+                category=UserWarning
+            )
+            
+        return c_sequence
     
-    @lru_cache(maxsize=None)
     def __compute_dissimilarity_metric__(self, x1: str, x2: str, compressor: str, metric: str) -> float:
         
-        x1_ = self.__apply_threshold_padding__(sequence=x1, compressor=compressor)
-        x2_ = self.__apply_threshold_padding__(sequence=x2, compressor=compressor)
-        x1x2 = self.__sequence_concatenation__(x1=x1_, x2=x2_)
-        x2x1 = self.__sequence_concatenation__(x1=x2_, x2=x1_)
+        x1x2 = self.join_string.join([x1, x2])
+        x2x1 = self.join_string.join([x2, x1])
         
-        c_x1 = self.__get_compression_size__(x1_, compressor)
-        c_x2 = self.__get_compression_size__(x2_, compressor)
+        c_x1 = self.__get_compression_size__(x1, compressor)
+        c_x2 = self.__get_compression_size__(x2, compressor)
         c_x1x2 = self.__get_compression_size__(x1x2, compressor)
         c_x2x1 = self.__get_compression_size__(x2x1, compressor)
-
 
         _score = compute_compression_metric(
             c_x1=c_x1,
@@ -134,9 +116,14 @@ class CompressionMatrix:
             metric=metric
         )
         
-        # assert _score >= 0, f"Expected disimilarity score >= 0, but got {_score}, x1:{x1}, x2:{x2}"
+        if _score <= 0:
+            warnings.warn(
+                f"Expected disimilarity score <= 0, but got {_score}, x1:{x1}, x2:{x2}, "
+                f"with compressor {compressor} and metric {metric}",
+                category=UserWarning
+            )
 
-        return max(self.epsilon, _score)
+        return _score
                 
     def compute_sigma(self, samples: List[str]) -> float:
 

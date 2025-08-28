@@ -2,13 +2,14 @@ import os
 import pickle
 import warnings
 import numpy as np
+from typing import Union
 from datetime import datetime
 from sklearn.metrics import (roc_curve, roc_auc_score, accuracy_score,
                              confusion_matrix, f1_score, log_loss,
                              fbeta_score, average_precision_score, balanced_accuracy_score, matthews_corrcoef)
 
 
-def make_report(y_true: np.ndarray, y_pred: np.ndarray, y_pred_proba: np.ndarray, save_path: str = None) -> dict:
+def make_report(y_true: Union[list, np.ndarray], y_pred: Union[list, np.ndarray], y_pred_proba: Union[list, np.ndarray], save_path: str = None) -> dict:
     """
     Generates a comprehensive performance report for results, including 
     ROC-related metrics, F1 scores, log loss, and confusion matrix evaluation.

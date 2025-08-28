@@ -975,6 +975,24 @@ wheels = [
 ]
 
 [[package]]
+name = "pyahocorasick"
+version = "2.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/68/4b/e3bee663803e2202be984e1291084355f064dfa3a6a632e01fe496445a5c/pyahocorasick-2.2.0.tar.gz", hash = "sha256:817f302088400a1402bf2f8631fdb21cf5a2666888e0d6a7d5a3ad556212e9da", size = 103916, upload-time = "2025-06-19T05:51:28.087Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/97/a6/b88ab854348f8449a544a435abb270ed65ed5b77ceada372ef9e998f367c/pyahocorasick-2.2.0-cp312-cp312-macosx_10_13_universal2.whl", hash = "sha256:744f63790fc4d337e129c80d28f57e6ba4d22a4b7e065825c72e98f92a77e16b", size = 58174, upload-time = "2025-06-19T05:51:07.874Z" },
+    { url = "https://files.pythonhosted.org/packages/b7/e3/6aa83f4f2852d03ce28872c139580913532a85686fc49f5136e4a7efce23/pyahocorasick-2.2.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:73bb94c5621565c5ad22d2f44d45edc7e568de5bd629d22a435e76d7023dae4e", size = 33285, upload-time = "2025-06-19T05:51:09.431Z" },
+    { url = "https://files.pythonhosted.org/packages/4c/e5/088c0169c36581d961eb24d770a3c0a48b95d029fd12fa343f7c1a28c11f/pyahocorasick-2.2.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4c3fb6406b3311319bef625f0269af276b75f834e5cba33b81f2e8c35a9c6c91", size = 114871, upload-time = "2025-06-19T05:51:10.513Z" },
+    { url = "https://files.pythonhosted.org/packages/66/e5/d3198bba8ce7cdf4c946f71a15bf75b26e2796b805ad43041a0ea77c422d/pyahocorasick-2.2.0-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:346f92c0086589e44c279d1519187bd3421d94836875033b27b7730f11bc923e", size = 117872, upload-time = "2025-06-19T05:51:11.859Z" },
+    { url = "https://files.pythonhosted.org/packages/55/15/ebd27c91dcb49487f8032e6046c11bee9037c793eb045a87d4df40c0af60/pyahocorasick-2.2.0-cp312-cp312-win_amd64.whl", hash = "sha256:1dbc761cdf8c9a1b85f065fb2442c234b742203df8e3cd2f38fc45e4838b02d3", size = 35028, upload-time = "2025-06-19T05:51:12.936Z" },
+    { url = "https://files.pythonhosted.org/packages/89/8c/d62a60af6025bc02ef2d25f29f93c591c06f4e43e51b2127f9a4a0954eb8/pyahocorasick-2.2.0-cp313-cp313-macosx_10_13_universal2.whl", hash = "sha256:54c9604d73051f96c2d5a6c267f404f3d2d02790a2680a0c0ee7069ef7660d8b", size = 58177, upload-time = "2025-06-19T05:51:13.999Z" },
+    { url = "https://files.pythonhosted.org/packages/41/97/b3cf05d0a3e545ce38a10c828fb188500a31261b679fd15ef717147eadee/pyahocorasick-2.2.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:57932f7e894107d5ddf011051feb081b0ff7fdd6ab94462ead0c4c716ffdbd47", size = 33285, upload-time = "2025-06-19T05:51:15.687Z" },
+    { url = "https://files.pythonhosted.org/packages/d6/44/b1cd7d1b35a5f77b45b5694def4a8e6560b44cafc0dce12b7dc19a609dbe/pyahocorasick-2.2.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:67c4489c2615fc4a25824d1f12c9e775d84c2207eecedde273bbffd479d82e71", size = 114812, upload-time = "2025-06-19T05:51:17.146Z" },
+    { url = "https://files.pythonhosted.org/packages/61/48/862fc0d3c92aa70a7c1721aa41460b8ac0a8d2e62aab039773c9b8d0c9d9/pyahocorasick-2.2.0-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:3f388b66e8973e8ac7cd7db7f90c56b2aaec4b5563b6da7bfc3e973b7ea34e1d", size = 117865, upload-time = "2025-06-19T05:51:18.619Z" },
+    { url = "https://files.pythonhosted.org/packages/1f/e3/7680654f2d5e06ed7df9c7e6387cf86ed48c670fc65d64924a9a03ccb0e7/pyahocorasick-2.2.0-cp313-cp313-win_amd64.whl", hash = "sha256:8eabbd6fcd65595d36dadc3fc57d536aa302833991cd6b0b872aae60c5eac3e9", size = 35021, upload-time = "2025-06-19T05:51:19.79Z" },
+]
+
+[[package]]
 name = "pycparser"
 version = "2.22"
 source = { registry = "https://pypi.org/simple" }
@@ -1220,12 +1238,19 @@ name = "scope"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "cmaes" },
     { name = "numpy" },
     { name = "optuna" },
     { name = "optuna-dashboard" },
+    { name = "optunahub" },
     { name = "pandas" },
     { name = "pot" },
     { name = "scikit-learn" },
+    { name = "scipy" },
+    { name = "smaz-py3" },
+    { name = "smilez" },
+    { name = "smizip" },
+    { name = "torch" },
     { name = "zstandard" },
 ]
 
@@ -1242,12 +1267,19 @@ experiments = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cmaes", specifier = ">=0.12.0" },
     { name = "numpy", specifier = ">=2.3.2" },
     { name = "optuna", specifier = ">=4.4.0" },
     { name = "optuna-dashboard", specifier = ">=0.19.0" },
+    { name = "optunahub", specifier = ">=0.3.1" },
     { name = "pandas", specifier = ">=2.3.1" },
     { name = "pot", specifier = ">=0.9.5" },
     { name = "scikit-learn", specifier = ">=1.7.1" },
+    { name = "scipy", specifier = ">=1.16.1" },
+    { name = "smaz-py3", specifier = ">=1.1.3" },
+    { name = "smilez", git = "https://github.com/davidlorenzana/smilez" },
+    { name = "smizip", specifier = ">=2.0.1" },
+    { name = "torch", specifier = ">=2.8.0" },
     { name = "zstandard", specifier = ">=0.23.0" },
 ]
 
@@ -1278,6 +1310,29 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031, upload-time = "2024-12-04T17:35:28.174Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
+]
+
+[[package]]
+name = "smaz-py3"
+version = "1.1.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/43/ea/e861dfbaddba1470afaeadd9d3d2a2d95d11bc9d51a45444d413adf87599/smaz-py3-1.1.3.tar.gz", hash = "sha256:a577dc6fd95f15a27196ebc96173fe907b07de173ea2234ddf6d18522499f6eb", size = 22477, upload-time = "2023-10-23T23:05:40.155Z" }
+
+[[package]]
+name = "smilez"
+version = "1.0"
+source = { git = "https://github.com/davidlorenzana/smilez#4007d543931550b450d54dcb9e77c440eed20324" }
+
+[[package]]
+name = "smizip"
+version = "2.0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyahocorasick" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/75/28/1e73d1352917bba1ba88b2b4337c7c762fcec6b08677419a6204ecedc80e/smizip-2.0.1.tar.gz", hash = "sha256:1ac3b3e56ff6a6f8fc366fe35f250ee5bf6b6749375e0bf7c08a8a6e27c9b21e", size = 12223, upload-time = "2025-02-01T16:43:40.248Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8b/a8/4a64bcc39ac17a4a5e4aff1ffa27535c64171442ff22309c02c3bfce56d8/smizip-2.0.1-py3-none-any.whl", hash = "sha256:5acc624e6ccda53e839c854c359b7e49a85ae53896a94e774996589ec6993aac", size = 12706, upload-time = "2025-02-01T16:43:38.12Z" },
 ]
 
 [[package]]

@@ -4,6 +4,7 @@ import pandas as pd
 from typing import List, Dict, Optional, Any, Union
 
 import optuna
+from optuna.storages import RDBStorage
 import optunahub
 
 from .base import ScOPEOptimizer
@@ -56,6 +57,11 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
         self.sampler_history = []  # Track which samplers were used
         
         os.makedirs(self.output_path, exist_ok=True)
+                
+        self.storage = RDBStorage(
+            f"sqlite:///{self.output_path}/optuna_{self.study_name}.sqlite3",
+            engine_kwargs={"connect_args": {"timeout": 20.0}}
+        )
     
     def optimize(self,
                 X_validation: List[str],
@@ -104,7 +110,7 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             direction=direction,
             sampler=self.auto_sampler_module.AutoSampler(**auto_sampler_kwargs),
             study_name=f"{self.study_name}_{self.study_date}",
-            storage=f"sqlite:///{self.output_path}/optuna_{self.study_name}.sqlite3",
+            storage=self.storage,
             load_if_exists=True
         )
         
@@ -341,7 +347,7 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             print("\nTop 5 configurations (AutoSampler discoveries):")
             columns_to_show = ['value', 'params_compressor_names', 'params_compression_metric_names', 
                               'params_model_type', 'params_get_sigma', 'params_aggregation_method',
-                              'params_join_string', 'params_compression_level']
+                              'params_join_string']
             
             # Add model-specific columns if they exist
             model_specific_columns = []
@@ -422,7 +428,6 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             f.write("-" * 30 + "\n")
             f.write(f"Compressor combinations: {len(self.parameter_space.compressor_names_options)}\n")
             f.write(f"Compression metric combinations: {len(self.parameter_space.compression_metric_names_options)}\n")
-            f.write(f"Compression levels range: {self.parameter_space.compression_levels_range}\n")
             f.write(f"Join string options: {self.parameter_space.concat_value_options}\n")
             f.write(f"Get sigma options: {self.parameter_space.get_sigma_options}\n")
             f.write(f"Model types: {self.parameter_space.model_types_options}\n")

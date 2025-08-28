@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List
 from dataclasses import dataclass, field
 from itertools import chain, combinations
 
@@ -25,8 +25,7 @@ class ParameterSpace:
     )
     
     concat_value_options: List[str] = field(
-        default_factory= lambda: [' ', '\n']
-        # default_factory= lambda: ["|||SEP_SAFE_DELIM_SEP|||"]
+        default_factory= lambda: [' ', '\n', '||SEP_SAFE_DELIM_SEP|||']
     )
     
     model_types_options: List[str] = field(
@@ -35,11 +34,6 @@ class ParameterSpace:
     
     aggregation_method_options: List[str] = field(
         default_factory= lambda: ['mean', 'median', 'sum', 'average', 'gmean', '']
-    )
-    
-    # Enteros
-    compression_levels_range: Tuple[int] = field(
-        default_factory=lambda: (1, 9)
     )
 
     # Booleanos

@@ -13,8 +13,6 @@ from scope.model import ScOPE
 from scope.utils.report_generation import make_report
 from .params import ParameterSpace
 
-# warnings.filterwarnings('ignore')
-
 
 class ScOPEOptimizer(ABC):
     """Updated ScOPE optimizer for the unified ScOPE class."""
@@ -88,7 +86,6 @@ class ScOPEOptimizer(ABC):
         print("BASIC PARAMETERS:")
         print(f"  • Compressor combinations ({len(self.parameter_space.compressor_names_options)})")
         print(f"  • Compression metric combinations ({len(self.parameter_space.compression_metric_names_options)})")
-        print(f"  • Compression levels range: {self.parameter_space.compression_levels_range}") 
         print(f"  • Join string options ({len(self.parameter_space.concat_value_options)}): {[repr(s) for s in self.parameter_space.concat_value_options]}")
         print(f"  • Get sigma options: {self.parameter_space.get_sigma_options}")
         print(f"  • Model types: {self.parameter_space.model_types_options}")
@@ -129,7 +126,6 @@ class ScOPEOptimizer(ABC):
             'aggregation_method': aggregation_method,
             'compressor_names': compressor_names,
             'compression_metric_names': compression_metric_names,
-            'compression_level': params['compression_level'],
             'join_string': params['join_string'],
             'get_sigma': params['get_sigma'],
         }
@@ -189,12 +185,7 @@ class ScOPEOptimizer(ABC):
     
     def suggest_integer_params(self, trial) -> Dict[str, Any]:
         """Suggest integer parameters using ranges."""
-        return {
-            'compression_level': trial.suggest_int(
-                'compression_level',
-                *self.parameter_space.compression_levels_range
-            ),
-        }
+        return {}
     
     def suggest_compressor_and_metric_params(self, trial) -> Dict[str, Any]:
         """Suggest compressor and metric combinations."""
@@ -427,6 +418,8 @@ class ScOPEOptimizer(ABC):
             return 'maximize'  # Combined always maximizes
         elif self.target_metric_name == 'log_loss':
             return 'minimize'
+        elif self.target_metric_name == 'mcc':
+            return 'maximize'
         else:
             return 'maximize'
 
