@@ -6,7 +6,6 @@
 """
 import warnings
 import numpy as np
-from copy import deepcopy
 from itertools import product
 from scipy.stats.mstats import hmean
 from typing import Union, List, Dict, Tuple
@@ -75,6 +74,12 @@ class CompressionMatrix:
         self.compressor_names = set(compressor_names)
         self.compression_metric_names = set(compression_metric_names)
         self.get_sigma = get_sigma
+        
+        self._total_compressors = len(self.compressors)
+        self._total_metrics = len(self.compression_metrics)
+        
+        self._n_compressors = len(self.compressor_names)
+        self._n_metrics = len(self.compression_metric_names)
 
     def __get_compression_size__(self, sequence: Union[str, bytes], compressor: str) -> int:
         """Comprime un string y retorna solo el tamaño"""
@@ -91,15 +96,7 @@ class CompressionMatrix:
 
         return c_sequence
     
-    def __compute_dissimilarity_metric__(self, x1: str, x2: str, compressor: str, metric: str) -> float:
-        
-        x1x2 = self.join_string.join([x1, x2])
-        x2x1 = self.join_string.join([x2, x1])
-        
-        c_x1 = self.__get_compression_size__(x1, compressor)
-        c_x2 = self.__get_compression_size__(x2, compressor)
-        c_x1x2 = self.__get_compression_size__(x1x2, compressor)
-        c_x2x1 = self.__get_compression_size__(x2x1, compressor)
+    def __compute_dissimilarity_metric__(self, c_x1: float, c_x2: float, c_x1x2: float, c_x2x1: float, metric: str) -> float:
 
         _score = compute_compression_metric(
             c_x1=c_x1,
@@ -111,8 +108,8 @@ class CompressionMatrix:
         
         if _score <= 0:
             warnings.warn(
-                f"Expected disimilarity score <= 0, but got {_score}, x1:{x1}, x2:{x2}, "
-                f"with compressor {compressor} and metric {metric}",
+                f"Expected disimilarity score <= 0, but got {_score}"
+                f"with metric {metric}",
                 category=UserWarning
             )
 
@@ -122,22 +119,25 @@ class CompressionMatrix:
 
         def _compute(x1: str) -> List[float]:
             sigmas: list = []
+            x1x2 = self.join_string.join([x1, x1])
+            
             for compressor in self.compressor_names:
-
+                c_x1 = self.__get_compression_size__(x1, compressor)
+                c_x1x2 = self.__get_compression_size__(x1x2, compressor)
+                
                 for metric in self.compression_metric_names:
                     _score = self.__compute_dissimilarity_metric__(
-                        x1=x1,
-                        x2=x1,
-                        compressor=compressor,
+                        c_x1=c_x1,
+                        c_x2=c_x1,
+                        c_x1x2=c_x1x2,
+                        c_x2x1=c_x1x2,
                         metric=metric
                     )
                     
                     sigmas.append(max(_score, self.epsilon))
 
             return sigmas
-        sigmas = np.array(
-            list(map(_compute, samples))
-        ).flatten()
+        sigmas = np.array([_compute(sample) for sample in samples]).flatten()
         
         sigma = hmean(sigmas)
         
@@ -147,32 +147,43 @@ class CompressionMatrix:
 
         matrix_values = np.full(
             shape=(
-                len(self.compressors),
-                len(self.compression_metrics),
+                self._total_compressors,
+                self._total_metrics,
             ),
             fill_value=np.nan
         )
         
+        x1x2 = self.join_string.join([x1, x2])
+        x2x1 = self.join_string.join([x2, x1])
+        
+        sequences = [x1, x2, x1x2, x2x1]
+        
         for compressor in self.compressor_names:
             compressor_index = self.compressors[compressor]
+            compressed_sizes = [
+                len(compute_compression(seq, compressor, self.compression_level))
+                for seq in sequences
+            ]
+            c_x1, c_x2, c_x1x2, c_x2x1 = compressed_sizes
             
             for metric in self.compression_metric_names:
                 metric_index = self.compression_metrics[metric]
                 
                 _score = self.__compute_dissimilarity_metric__(
-                    x1=x1,
-                    x2=x2,
-                    compressor=compressor,
+                    c_x1=c_x1,
+                    c_x2=c_x2,
+                    c_x1x2=c_x1x2,
+                    c_x2x1=c_x2x1,
                     metric=metric
                 )
-
+                
                 matrix_values[compressor_index, metric_index] = _score
             
         nan_mask = ~np.isnan(matrix_values)
 
         result = matrix_values[nan_mask].reshape(
-            len(self.compressor_names),
-            len(self.compression_metric_names)
+            self._n_compressors,
+            self._n_metrics
         )
 
         return result
@@ -180,8 +191,6 @@ class CompressionMatrix:
     def compute_ova(self, sample: str, cluster: List[str]) -> Tuple[np.ndarray, np.ndarray, float]:
 
         sigma = float('inf')
-
-        cluster = deepcopy(cluster)
 
         combinations = list(product(cluster, repeat=2))
 
@@ -191,8 +200,8 @@ class CompressionMatrix:
             shape=(
                 1,
                 len(cluster),
-                len(self.compressor_names),
-                len(self.compression_metric_names),
+                self._n_compressors,
+                self._n_metrics,
             )
         )
 
@@ -200,8 +209,8 @@ class CompressionMatrix:
             shape=(
                 len(cluster) - 1,
                 len(cluster),
-                len(self.compressor_names),
-                len(self.compression_metric_names),
+                self._n_compressors,
+                self._n_metrics,
             )
         )
 
@@ -268,23 +277,16 @@ class CompressionMatrix:
 
     def get_multiple_compression_matrix(self, samples: List[str], kw_samples: List[Dict[Union[int, str], List[str]]]) ->  List[Dict[str, np.ndarray]]:
 
-        results = []
-
         if len(samples) != len(kw_samples):
             raise ValueError(
                 f"'samples' and 'kw_samples' must have the same length "
                 f"(got {len(samples)} and {len(kw_samples)})."
             )
-
-        for index, sample in enumerate(samples):
-            compression_matrix = self.get_one_compression_matrix(
-                sample=sample,
-                kw_samples=kw_samples[index]
-            )
-
-            results.append(compression_matrix)
-
-        return results
+            
+        return [
+            self.get_one_compression_matrix(sample, kw_sample)
+            for sample, kw_sample in zip(samples, kw_samples)
+        ]
 
     def __call__(self,
                  samples: Union[List[str], str],

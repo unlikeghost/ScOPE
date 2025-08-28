@@ -107,7 +107,7 @@ optimizer = ScOPEOptimizerAuto(
     n_trials=TRIALS,
     random_seed=RANDOM_SEED,
     target_metric=TARGET_METRIC,
-    study_name=f'{STUDY_NAME}_Samples_{TEST_SAMPLES}',
+    study_name=STUDY_NAME,
     output_path=ANALYSIS_RESULTS_PATH,
     cv_folds=CVFOLDS
 )
@@ -129,7 +129,7 @@ study = optimizer.optimize(
     search_all_kw
 )
 
-optimizer.save_complete_analysis(top_n=TRIALS)
+optimizer.save_complete_analysis()
 
 best_model = optimizer.get_best_model()
 

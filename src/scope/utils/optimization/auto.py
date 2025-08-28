@@ -22,17 +22,11 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
                  cv_folds: int = 3,
                  study_name: str = "scope_auto_optimization",
                  output_path: str = "./results",
-                 n_trials: int = 75,  # Balanced for auto-selection
+                 n_trials: int = 75,
                  target_metric: Union[str, Dict[str, float]] = 'auc_roc',
                  use_cache: bool = True,
-                 # constraints_func: Optional[callable] = None
                  ):
-        """Initialize the AutoSampler optimizer
-        
-        Args:
-            constraints_func: Optional constraint function for the optimization.
-                             Should return True if constraints are satisfied.
-        """
+        """Initialize the AutoSampler optimizer."""
         super().__init__(
             parameter_space=parameter_space, 
             free_cpu=free_cpu,
@@ -45,16 +39,13 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             use_cache=use_cache
         )
         
-        # self.constraints_func = constraints_func
         try:
             self.auto_sampler_module = optunahub.load_module("samplers/auto_sampler")
-            print("✓ AutoSampler loaded successfully from OptunaHub")
+            print("AutoSampler loaded successfully from OptunaHub")
         except Exception as e:
-            print(f"❌ Failed to load AutoSampler: {e}")
-            print("💡 Make sure you have installed: pip install optunahub cmaes scipy torch")
+            print(f"Failed to load AutoSampler: {e}")
+            print("Make sure you have installed: pip install optunahub cmaes scipy torch")
             raise ImportError("AutoSampler dependencies not available. Please install: pip install optunahub cmaes scipy torch")
-    
-        self.sampler_history = []  # Track which samplers were used
         
         os.makedirs(self.output_path, exist_ok=True)
                 
@@ -74,10 +65,8 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
         print(f"Classes: {sorted(set(y_validation))}")
         print(f"Trials: {self.n_trials}")
         print(f"CV Folds: {self.cv_folds}")
-        # print(f"Constraints function: {'Yes' if self.constraints_func else 'None'}")
         print()
         
-                
         self.validate_data(y_validation)
         self.validate_optimization_setup()
         
@@ -85,7 +74,7 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
         print()
         
         self.print_parameter_space()
-        print("\n🤖 AutoSampler Strategy:")
+        print("\nAutoSampler Strategy:")
         print("• GPSampler: Early stages (excellent sample efficiency)")
         print("• TPESampler: Categorical variables (flexible handling)")
         print("• Dynamic switching: Adapts based on optimization progress")
@@ -97,15 +86,10 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
         
         direction = self.get_optimization_direction()
         
-        # Configure AutoSampler
         auto_sampler_kwargs = {
             'seed': self.random_seed,
         }
         
-        # if self.constraints_func:
-        #     auto_sampler_kwargs['constraints_func'] = self.constraints_func
-        
-        # Configure Optuna study with AutoSampler
         self.study = optuna.create_study(
             direction=direction,
             sampler=self.auto_sampler_module.AutoSampler(**auto_sampler_kwargs),
@@ -114,39 +98,24 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             load_if_exists=True
         )
         
-        # Execute optimization
         print("\nStarting AutoSampler optimization...")
-        print("🔄 AutoSampler will automatically switch between algorithms as needed...")
-        
-        # Custom callback to track sampler usage
-        def track_sampler_callback(study, trial):
-            # Try to get information about which sampler was used
-            # This is approximate since AutoSampler doesn't expose this directly
-            current_sampler = type(study.sampler).__name__
-            if len(self.sampler_history) == 0 or self.sampler_history[-1] != current_sampler:
-                self.sampler_history.append(current_sampler)
-                print(f"🔀 Trial {trial.number}: Using {current_sampler}")
+        print("AutoSampler will automatically switch between algorithms as needed...")
         
         self.study.optimize(
             objective_func,
             n_trials=self.n_trials,
-            n_jobs=self.n_jobs,
-            callbacks=[track_sampler_callback]
+            n_jobs=self.n_jobs
         )
         
-        # Store best results
         self.best_params = self.study.best_params
         self.best_model = self.create_model_from_params(self.best_params)
         
-        # Show results
         print("\n=== AUTO SAMPLER OPTIMIZATION RESULTS ===")
         print(f"Best score: {self.study.best_value:.4f}")
         
-        # Analyze best model configuration
         compressor_names = self.best_params['compressor_names'].split(',')
         compression_metric_names = self.best_params['compression_metric_names'].split(',')
         
-        # Determine if it's an ensemble
         is_ensemble = len(compressor_names) > 1 or len(compression_metric_names) > 1
         
         print(f"Best model type: {self.best_params.get('model_type', 'unknown')}")
@@ -160,7 +129,6 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
         if aggregation_method is not None:
             print(f"Aggregation method: {aggregation_method}")
         
-        # Show model-specific parameters
         model_type = self.best_params.get('model_type')
         if model_type == 'ot':
             matching_metric = self.best_params.get('matching_metric')
@@ -171,7 +139,6 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             if distance_metric:
                 print(f"Distance metric (PD): {distance_metric}")
         
-        # Show AutoSampler insights
         self._analyze_auto_sampler_performance()
         
         cache_size = self._eval_cache_size_()
@@ -192,16 +159,12 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
         if not self.study or not self.study.trials:
             return
         
-        print("\n🤖 AutoSampler Analysis:")
-        print(f"   Total samplers used: {len(set(self.sampler_history))}")
-        print(f"   Sampler transitions: {len(self.sampler_history) - 1}")
+        print("\nAutoSampler Analysis:")
         
-        # Analyze performance progression
         completed_trials = [t for t in self.study.trials if t.state == optuna.trial.TrialState.COMPLETE]
         if len(completed_trials) >= 10:
             values = [t.value for t in completed_trials]
             
-            # Early vs late performance
             early_trials = values[:len(values)//3] if len(values) >= 9 else values[:3]
             late_trials = values[-len(values)//3:] if len(values) >= 9 else values[-3:]
             
@@ -218,7 +181,6 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             print(f"   Late stage best: {late_best:.4f}")
             print(f"   Improvement: {improvement:.4f}")
             
-            # Analyze consistency
             if len(values) >= 20:
                 recent_std = pd.Series(values[-10:]).std()
                 print(f"   Recent convergence (std): {recent_std:.4f}")
@@ -231,7 +193,6 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
         
         print("\n=== DETAILED AUTO SAMPLER ANALYSIS ===")
         
-        # Basic statistics
         completed_trials = len([t for t in self.study.trials if t.state == optuna.trial.TrialState.COMPLETE])
         pruned_trials = len([t for t in self.study.trials if t.state == optuna.trial.TrialState.PRUNED])
         failed_trials = len([t for t in self.study.trials if t.state == optuna.trial.TrialState.FAIL])
@@ -240,30 +201,25 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
         print(f"Pruned trials: {pruned_trials}")
         print(f"Failed trials: {failed_trials}")
         
-        # AutoSampler specific analysis
         print("\nAutoSampler Configuration:")
         print(f"  • Sampler: {type(self.study.sampler).__name__}")
-        # print(f"  • Constraints: {'Yes' if self.constraints_func else 'None'}")
         print("  • Adaptive strategy: Automatic (GPSampler + TPESampler)")
         
-        # Performance evolution analysis
         if len(self.study.trials) >= 10:
             values = [t.value for t in self.study.trials if t.value is not None]
             if values:
                 print("\nPerformance Evolution:")
                 
-                # Divide into phases
                 phase_size = len(values) // 3
                 if phase_size > 0:
-                    phase1 = values[:phase_size]  # Early exploration
-                    phase2 = values[phase_size:2*phase_size]  # Middle exploitation
-                    phase3 = values[2*phase_size:]  # Final convergence
+                    phase1 = values[:phase_size]
+                    phase2 = values[phase_size:2*phase_size]
+                    phase3 = values[2*phase_size:]
                     
                     print(f"  • Phase 1 (Exploration) avg: {sum(phase1)/len(phase1):.4f}")
                     print(f"  • Phase 2 (Exploitation) avg: {sum(phase2)/len(phase2):.4f}")
                     print(f"  • Phase 3 (Convergence) avg: {sum(phase3)/len(phase3):.4f}")
                     
-                    # Best in each phase
                     if self.get_optimization_direction() == 'maximize':
                         print(f"  • Best in phase 1: {max(phase1):.4f}")
                         print(f"  • Best in phase 2: {max(phase2):.4f}")
@@ -273,12 +229,10 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
                         print(f"  • Best in phase 2: {min(phase2):.4f}")
                         print(f"  • Best in phase 3: {min(phase3):.4f}")
         
-        # Ensemble vs Individual analysis (updated for new structure)
-        df_results = self.get_trials_dataframe()
+        df_results = self.study.trials_dataframe()
         if not df_results.empty:
             print(f"\nTotal unique parameter combinations evaluated: {len(df_results)}")
             
-            # Analyze ensemble vs individual
             ensemble_trials = []
             individual_trials = []
             
@@ -305,13 +259,11 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
                 individual_df = pd.DataFrame(individual_trials)
                 print(f"  Best individual score: {individual_df['value'].max():.4f}")
         
-        # Parameter importance (works well with AutoSampler)
         try:
             importances = optuna.importance.get_param_importances(self.study)
             print("\nParameter importance (AutoSampler insights):")
             print("-" * 50)
             
-            # Separate parameters by category (updated for new parameters)
             basic_params = {}
             model_specific_params = {}
             
@@ -321,7 +273,6 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
                 else:
                     basic_params[param] = importance
             
-            # Print by category
             if basic_params:
                 print("Basic Parameters:")
                 for param, importance in sorted(basic_params.items(), key=lambda x: x[1], reverse=True):
@@ -334,7 +285,6 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
                     print(f"  {param}: {importance:.6f}")
                 print()
             
-            # AutoSampler generally provides good parameter importance
             print("Overall Ranking (Top 10 - AutoSampler prioritized):")
             top_params = sorted(importances.items(), key=lambda x: x[1], reverse=True)[:10]
             for param, importance in top_params:
@@ -342,23 +292,6 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             
         except Exception as e:
             print(f"Could not calculate parameter importance: {e}")
-        
-        if not df_results.empty:
-            print("\nTop 5 configurations (AutoSampler discoveries):")
-            columns_to_show = ['value', 'params_compressor_names', 'params_compression_metric_names', 
-                              'params_model_type', 'params_get_sigma', 'params_aggregation_method',
-                              'params_join_string']
-            
-            # Add model-specific columns if they exist
-            model_specific_columns = []
-            for col in df_results.columns:
-                if col.startswith('params_matching_metric') or col.startswith('params_distance_metric'):
-                    model_specific_columns.append(col)
-            
-            columns_to_show.extend(model_specific_columns)
-            available_columns = [col for col in columns_to_show if col in df_results.columns]
-            top_trials = df_results.nlargest(5, 'value')[available_columns]
-            print(top_trials)
         
         return df_results
     
@@ -378,7 +311,6 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             f.write("SCOPE AUTOSAMPLER OPTIMIZATION ANALYSIS REPORT\n")
             f.write("=" * 60 + "\n\n")
             
-            # Study information
             f.write("STUDY INFORMATION:\n")
             f.write("-" * 30 + "\n")
             f.write(f"Study name: {self.study_name}\n")
@@ -386,15 +318,12 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             f.write(f"Output path: {self.output_path}\n")
             f.write("Sampler: AutoSampler (adaptive algorithm selection)\n\n")
             
-            # AutoSampler configuration
             f.write("AUTOSAMPLER CONFIGURATION:\n")
             f.write("-" * 30 + "\n")
             f.write("Adaptive strategy: GPSampler (early) + TPESampler (categorical) + dynamic switching\n")
-            # f.write(f"Constraints function: {'Yes' if self.constraints_func else 'None'}\n")
             f.write(f"Random seed: {self.random_seed}\n")
             f.write("Automatic algorithm selection: Enabled\n\n")
             
-            # Study configuration
             f.write("OPTIMIZATION CONFIGURATION:\n")
             f.write("-" * 30 + "\n")
             
@@ -411,7 +340,6 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             f.write(f"CV folds: {self.cv_folds}\n")
             f.write(f"Best score achieved: {self.study.best_value:.6f}\n\n")
             
-            # AutoSampler strategy explanation
             f.write("AUTOSAMPLER STRATEGY:\n")
             f.write("-" * 30 + "\n")
             f.write("AutoSampler automatically selects the best algorithm based on:\n")
@@ -423,7 +351,6 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             f.write("• TPESampler: Flexible handling of categorical variables\n")
             f.write("• Dynamic switching: Adapts based on convergence patterns\n\n")
             
-            # Updated parameter space information
             f.write("PARAMETER SPACE:\n")
             f.write("-" * 30 + "\n")
             f.write(f"Compressor combinations: {len(self.parameter_space.compressor_names_options)}\n")
@@ -437,8 +364,8 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             
         print(f"AutoSampler analysis report saved to {filepath}")
     
-    def save_complete_analysis(self, top_n: int = 10):
-        """Save complete AutoSampler analysis: pickle, text report, and CSV"""
+    def save_complete_analysis(self):
+        """Save only essential analysis files - SQLite has the full data"""
         
         if self.study is None:
             raise ValueError("No study found. Run optimize() first.")
@@ -446,34 +373,19 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
         self.save_results()
         self.save_analysis_report()
         
-        # Save top results as CSV
-        df_results = self.get_trials_dataframe()
-        if not df_results.empty:
-            csv_filename = f"{self.study_name}_auto_top{top_n}_{self.study_date}.csv"
-            csv_filepath = os.path.join(self.output_path, csv_filename)
-            
-            df_top = df_results.nlargest(top_n, 'value')
-            df_top.to_csv(csv_filepath, index=False)
-            
-            print(f"\nComplete AutoSampler analysis saved for study: {self.study_name}")
-            print(f"Output directory: {self.output_path}")
-            print("Files created:")
-            print(f"  - {self.study_name}_results_{self.study_date}.pkl (complete study data)")
-            print(f"  - {self.study_name}_auto_analysis_{self.study_date}.txt (detailed report)")
-            print(f"  - {csv_filename} (top {top_n} configurations)")
-            
-            return df_top
-        
-        return None
+        print("\nAnalysis saved - no data duplication:")
+        print(f"Directory: {self.output_path}/")
+        print(f"  optuna_{self.study_name}.sqlite3 (FULL DATA - use optuna-dashboard)")
+        print(f"  {self.study_name}_metadata_{self.study_date}.pkl (config only)")
+        print(f"  {self.study_name}_analysis_{self.study_date}.txt (human readable report)")
+        print(f"\nTo view results: optuna-dashboard sqlite:///{self.output_path}/optuna_{self.study_name}.sqlite3")
     
     def compare_with_baseline(self, baseline_optimizer, X_validation, y_validation, kw_samples_validation):
         """Compare AutoSampler performance with another optimizer"""
-        print(f"\n🔄 Comparing AutoSampler vs {type(baseline_optimizer).__name__}...")
+        print(f"\nComparing AutoSampler vs {type(baseline_optimizer).__name__}...")
         
-        # Run baseline
         baseline_study = baseline_optimizer.optimize(X_validation, y_validation, kw_samples_validation)
         
-        # Compare results
         auto_best = self.study.best_value
         baseline_best = baseline_study.best_value
         
@@ -484,11 +396,11 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             improvement = baseline_best - auto_best  
             better = auto_best < baseline_best
         
-        print("\n📊 Comparison Results:")
+        print("\nComparison Results:")
         print(f"   AutoSampler best: {auto_best:.4f}")
         print(f"   {type(baseline_optimizer).__name__} best: {baseline_best:.4f}")
         print(f"   Improvement: {improvement:.4f}")
-        print(f"   AutoSampler is {'✓ Better' if better else '✗ Worse'}")
+        print(f"   AutoSampler is {'Better' if better else 'Worse'}")
         
         return {
             'auto_best': auto_best,

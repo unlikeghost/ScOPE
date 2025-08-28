@@ -57,7 +57,7 @@ kw_samples_train = [
 # -------------------- Optimización --------------------
 optimizer = ScOPEOptimizerAuto(
     random_seed=42,
-    n_trials=500,
+    n_trials=100,
     target_metric='log_loss',
     study_name="parameter_search"
 )
@@ -66,7 +66,7 @@ study = optimizer.optimize(x_train, y_train, kw_samples_train)
 
 best_model = optimizer.get_best_model()
 
-optimizer.save_complete_analysis(top_n=100)
+optimizer.save_complete_analysis()
 
 # -------------------- Validación --------------------
 all_y_true = y_validation

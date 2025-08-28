@@ -9,6 +9,8 @@ from abc import ABC, abstractmethod
 from sklearn.model_selection import StratifiedKFold
 from collections import OrderedDict
 
+import optuna
+
 from scope.model import ScOPE
 from scope.utils.report_generation import make_report
 from .params import ParameterSpace
@@ -64,16 +66,15 @@ class ScOPEOptimizer(ABC):
         
         self.use_cache = use_cache
         self._eval_cache = {}
+        self._cache_max_size = 1000  # Límite para evitar memory leaks
         
     def _make_cache_key(self, model):
         """Create cache key for model parameters."""
-        # Use the model's to_dict method if available
         model_params = model.to_dict()
-        
         key_str = json.dumps(model_params, sort_keys=True, default=str)
         return hashlib.md5(key_str.encode()).hexdigest()
 
-    def _eval_cache_size_(self) -> float:
+    def _eval_cache_size_(self) -> int:
         """Get current cache size."""
         return len(self._eval_cache)
 
@@ -82,7 +83,6 @@ class ScOPEOptimizer(ABC):
         print("Parameter space includes:")
         print("=" * 60)
         
-        # Basic parameters
         print("BASIC PARAMETERS:")
         print(f"  • Compressor combinations ({len(self.parameter_space.compressor_names_options)})")
         print(f"  • Compression metric combinations ({len(self.parameter_space.compression_metric_names_options)})")
@@ -92,12 +92,9 @@ class ScOPEOptimizer(ABC):
         print(f"  • Aggregation methods: {self.parameter_space.aggregation_method_options}")
         
         print("\nMODEL-SPECIFIC PARAMETERS:")
-        
-        # ScOPE-OT parameters
         print("  ScOPE-OT:")
         print(f"    • Matching metrics: {self.parameter_space.matching_metrics}")
         
-        # ScOPE-PD parameters  
         print("  ScOPE-PD:")
         print(f"    • Distance metrics: {self.parameter_space.distance_metrics}")
         
@@ -106,7 +103,6 @@ class ScOPEOptimizer(ABC):
     def create_model_from_params(self, params: Dict[str, Any]) -> ScOPE:
         """Create ScOPE model based on parameters."""
         
-        # Convert string lists back to actual lists if needed
         compressor_names = params['compressor_names']
         if isinstance(compressor_names, str):
             compressor_names = compressor_names.split(',')
@@ -115,12 +111,10 @@ class ScOPEOptimizer(ABC):
         if isinstance(compression_metric_names, str):
             compression_metric_names = compression_metric_names.split(',')
         
-        # Handle aggregation_method None properly
         aggregation_method = params.get('aggregation_method')
         if aggregation_method == 'None' or aggregation_method == 'null' or aggregation_method == '':
             aggregation_method = None
         
-        # Base parameters for ScOPE
         base_params = {
             'model_type': params['model_type'],
             'aggregation_method': aggregation_method,
@@ -130,25 +124,19 @@ class ScOPEOptimizer(ABC):
             'get_sigma': params['get_sigma'],
         }
         
-        # Model-specific parameters - handle None and invalid types correctly
         model_type = params['model_type']
         
         if model_type == "ot":
             matching_metric = params.get('matching_metric')
-            # ScOPEOT expects either a valid string or None (not bool or other types)
             if matching_metric is not None:
-                # Convert invalid types to None
                 if not isinstance(matching_metric, str) or matching_metric == 'True' or matching_metric == 'False':
                     matching_metric = None
-                # Pass None or valid string to the model
                 base_params['matching_metric'] = matching_metric
             else:
-                # Explicitly pass None
                 base_params['matching_metric'] = None
                 
         elif model_type == "pd":
             distance_metric = params.get('distance_metric')
-            # Only add if it's a valid string (PD doesn't accept None)
             if distance_metric is not None and isinstance(distance_metric, str):
                 base_params['distance_metric'] = distance_metric
 
@@ -170,7 +158,6 @@ class ScOPEOptimizer(ABC):
                 'model_type',
                 self.parameter_space.model_types_options
             ),
-            # Convertir string vacío a None
             'aggregation_method': None if aggregation_method == '' else aggregation_method
         }
         
@@ -201,45 +188,34 @@ class ScOPEOptimizer(ABC):
         }
     
     def suggest_model_specific_params(self, trial, model_type: str) -> Dict[str, Any]:
-            """Suggest model-specific parameters ONLY for the selected model type."""        
-            params = {}
-                    
-            if model_type == "ot":
-                # ONLY for OT: matching metric
-                matching_metric = trial.suggest_categorical(
-                    'matching_metric',
-                    self.parameter_space.matching_metrics
-                )
-                params['matching_metric'] = None if matching_metric == '' else matching_metric
+        """Suggest model-specific parameters ONLY for the selected model type."""        
+        params = {}
                 
-            elif model_type == "pd":
-                # ONLY for PD: distance metric
-                distance_metric = trial.suggest_categorical(
-                    'distance_metric',
-                    self.parameter_space.distance_metrics
-                )
-                if distance_metric != '':
-                    params['distance_metric'] = distance_metric
+        if model_type == "ot":
+            matching_metric = trial.suggest_categorical(
+                'matching_metric',
+                self.parameter_space.matching_metrics
+            )
+            params['matching_metric'] = None if matching_metric == '' else matching_metric
             
-            return params
+        elif model_type == "pd":
+            distance_metric = trial.suggest_categorical(
+                'distance_metric',
+                self.parameter_space.distance_metrics
+            )
+            if distance_metric != '':
+                params['distance_metric'] = distance_metric
+        
+        return params
             
     def suggest_all_params(self, trial) -> Dict[str, Any]:
         """Combine all parameter suggestions."""
         params = {}
         
-        # Categorical parameters
         params.update(self.suggest_categorical_params(trial))
-        
-        # Boolean parameters
         params.update(self.suggest_boolean_params(trial))
-        
-        # Integer parameters (ranges)
         params.update(self.suggest_integer_params(trial))
-        
-        # Compressor and metric combinations
         params.update(self.suggest_compressor_and_metric_params(trial))
-        
-        # Model-specific parameters
         params.update(self.suggest_model_specific_params(trial, params['model_type']))
 
         return params
@@ -290,29 +266,22 @@ class ScOPEOptimizer(ABC):
                 
                 for sample, kw_sample in zip(X_val, kw_val):
                     try:
-                        # Process one sample at a time (like the original)
                         predictions = model(samples=sample, kw_samples=kw_sample)
-                        # Extract the first prediction from the list
                         if isinstance(predictions, list) and len(predictions) > 0:
                             prediction: dict = predictions[0]
                         else:
                             raise ValueError("Expected list of predictions")
                         
-                        # Extract predicted class (already computed)
                         predicted_class_str = prediction.get('predicted_class', '0')
                         try:
                             predicted_class = int(predicted_class_str)
                         except (ValueError, TypeError):
                             predicted_class = 0
                         
-                        # Extract probabilities (always available)
                         probs: dict = prediction.get('probas', {})
-                        
-                        # Ensure probabilities are ordered consistently
                         probs = OrderedDict(sorted(probs.items()))
                         proba_values = list(probs.values())
                         
-                        # Validate probabilities
                         if len(proba_values) != 2:
                             raise ValueError(f"Expected 2 class probabilities, got {len(proba_values)}")
                         
@@ -323,11 +292,9 @@ class ScOPEOptimizer(ABC):
                         print('Some error on prediction come up')
                         print(e)
                        
-                        # Handle error by using random predictions
                         random_pred = np.random.randint(0, 2)
                         y_pred.append(random_pred)
                         
-                        # Generate random probabilities
                         random_proba = np.random.dirichlet([1, 1])
                         y_pred_proba.append(random_proba.tolist())
 
@@ -386,6 +353,12 @@ class ScOPEOptimizer(ABC):
         }
         
         if self.use_cache and key is not None:
+            # Limpiar cache si está muy grande
+            if len(self._eval_cache) > self._cache_max_size:
+                keep_size = int(self._cache_max_size * 0.8)
+                keys_to_keep = list(self._eval_cache.keys())[-keep_size:]
+                self._eval_cache = {k: self._eval_cache[k] for k in keys_to_keep}
+            
             self._eval_cache[key] = final_scores
         
         return final_scores
@@ -408,14 +381,14 @@ class ScOPEOptimizer(ABC):
             return combined_score
             
         elif self.target_metric_name == 'log_loss':
-            return scores['log_loss']  # Minimize
+            return scores['log_loss']
         else:
-            return scores[self.target_metric_name]  # Maximize
+            return scores[self.target_metric_name]
 
     def get_optimization_direction(self) -> str:
         """Determine optimization direction for Optuna."""
         if self.is_combined:
-            return 'maximize'  # Combined always maximizes
+            return 'maximize'
         elif self.target_metric_name == 'log_loss':
             return 'minimize'
         elif self.target_metric_name == 'mcc':
@@ -471,31 +444,36 @@ class ScOPEOptimizer(ABC):
         
         print("Optimization setup validation passed")
 
-    def load_results(self, filepath: str):
-        """Load previous results."""
-        with open(filepath, 'rb') as f:
-            results = pickle.load(f)
+    def load_results(self, study_name: Optional[str] = None):
+        """Load previous results from SQLite database."""
+        import optuna
+        from optuna.storages import RDBStorage
         
-        self.study = results['study']
-        self.best_params = results['best_params']
-        self.best_model = self.create_model_from_params(self.best_params)
+        if study_name:
+            storage = RDBStorage(f"sqlite:///{self.output_path}/optuna_{study_name}.sqlite3")
+            target_study_name = study_name
+        else:
+            # Assume storage is already set up in subclass
+            storage = getattr(self, 'storage', None)
+            target_study_name = self.study_name
+            
+            if storage is None:
+                raise ValueError("No storage configured. Cannot load results.")
         
-        print(f"Results loaded from {filepath}")
-
-    def get_trials_dataframe(self):
-        """Get DataFrame with all trials."""
-        if self.study is None:
-            raise ValueError("No study found. Run optimize() first.")
-        
-        data = self.study.trials_dataframe()
-        
-        df_sorted = data.sort_values(by='value', ascending=False)
-        
-        param_cols = [col for col in df_sorted.columns if col.startswith('params_')]
-
-        df_unique = df_sorted.drop_duplicates(subset=param_cols, keep='first')
-        
-        return df_unique
+        try:
+            self.study = optuna.load_study(
+                study_name=target_study_name,
+                storage=storage
+            )
+            
+            self.best_params = self.study.best_params
+            self.best_model = self.create_model_from_params(self.best_params)
+            
+            print(f"Study loaded from SQLite: {len(self.study.trials)} trials")
+            print(f"Best value: {self.study.best_value}")
+            
+        except Exception as e:
+            raise ValueError(f"Could not load study: {e}")
 
     def print_best_configuration(self):
         """Print best configuration."""
@@ -529,32 +507,39 @@ class ScOPEOptimizer(ABC):
         return self.best_model
 
     def save_results(self, filename: Optional[str] = None):
-        """Save optimization results."""
+        """Save only metadata - SQLite has the full study data."""
         if self.study is None:
             raise ValueError("No study found. Run optimize() first.")
         
         if filename is None:
-            filename = f"{self.study_name}_results_{self.study_date}.pkl"
+            filename = f"{self.study_name}_metadata_{self.study_date}.pkl"
         
         os.makedirs(self.output_path, exist_ok=True)
         filepath = os.path.join(self.output_path, filename)
         
+        # Solo guardar metadatos que NO están en SQLite
         results = {
-            'study': self.study,
-            'best_params': self.best_params,
-            'best_value': self.study.best_value,
-            'trials_dataframe': self.study.trials_dataframe(),
+            'study_name': self.study_name,
+            'study_date': self.study_date,
+            'n_trials_completed': len([t for t in self.study.trials if t.state == optuna.trial.TrialState.COMPLETE]),
             'target_metric_info': {
                 'is_combined': self.is_combined,
                 'target_metric_name': self.target_metric_name,
                 'target_metric_weights': self.target_metric_weights
-            }
+            },
+            'parameter_space_config': {
+                'compressor_names_options': self.parameter_space.compressor_names_options,
+                'compression_metric_names_options': self.parameter_space.compression_metric_names_options,
+                'model_types_options': self.parameter_space.model_types_options
+            },
+            'sqlite_path': f"{self.output_path}/optuna_{self.study_name}.sqlite3"
         }
         
         with open(filepath, 'wb') as f:
             pickle.dump(results, f)
         
-        print(f"Results saved to {filepath}")
+        print(f"Metadata saved to {filepath}")
+        print(f"Full study data in SQLite: {results['sqlite_path']}")
     
     @abstractmethod
     def optimize(self, 
