@@ -17,7 +17,7 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
     
     def __init__(self, 
                  parameter_space: Optional[ParameterSpace] = None,
-                 free_cpu: int = 0,
+                 n_jobs: int = 1,
                  random_seed: int = 42,
                  cv_folds: int = 3,
                  study_name: str = "scope_auto_optimization",
@@ -29,7 +29,7 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
         """Initialize the AutoSampler optimizer."""
         super().__init__(
             parameter_space=parameter_space, 
-            free_cpu=free_cpu,
+            n_jobs=n_jobs,
             random_seed=random_seed,
             cv_folds=cv_folds,
             study_name=study_name,

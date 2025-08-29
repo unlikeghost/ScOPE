@@ -6,6 +6,8 @@
 """
 import warnings
 import numpy as np
+import multiprocessing
+import concurrent.futures
 from itertools import product
 from scipy.stats.mstats import hmean
 from typing import Union, List, Dict, Tuple
@@ -42,6 +44,7 @@ class CompressionMatrix:
                  compression_level: int = 9,
                  join_string: str = "|||ScOPE_SEPARATOR_BOUNDARY|||",
                  get_sigma: bool = True,
+                 n_jobs: int = -1
                  ):
                      
         if isinstance(compressor_names, str):
@@ -80,7 +83,12 @@ class CompressionMatrix:
         
         self._n_compressors = len(self.compressor_names)
         self._n_metrics = len(self.compression_metric_names)
-
+        
+        if n_jobs == -1:
+           self.workers = multiprocessing.cpu_count()
+        else:
+            self.workers = min(multiprocessing.cpu_count(), n_jobs)
+        
     def __get_compression_size__(self, sequence: Union[str, bytes], compressor: str) -> int:
         """Comprime un string y retorna solo el tamaño"""
         if len(sequence) == 0:
@@ -187,8 +195,47 @@ class CompressionMatrix:
         )
 
         return result
-
-    def compute_ova(self, sample: str, cluster: List[str]) -> Tuple[np.ndarray, np.ndarray, float]:
+    
+    def __ova_threads__(self, sample: str, cluster: List[str]) -> Tuple[np.ndarray, np.ndarray, float]:
+        """Versión con ThreadPoolExecutor - menos overhead que multiprocessing"""
+        sigma = float('inf')
+        
+        combinations = list(product(cluster, repeat=2))
+        cluster_v_cluster = combinations[:-len(cluster)]
+        
+        sample_matrix = np.zeros((1, len(cluster), self._n_compressors, self._n_metrics))
+        cluster_matrix = np.zeros((len(cluster) - 1, len(cluster), self._n_compressors, self._n_metrics))
+        
+        # Usar ThreadPoolExecutor en lugar de multiprocessing.Pool
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.workers) as executor:
+            # Sample comparisons
+            sample_futures = []
+            for index, kw_cluster_sample in enumerate(cluster):
+                future = executor.submit(self.compute_ovo, sample, kw_cluster_sample)
+                sample_futures.append((index, future))
+            
+            # Cluster comparisons
+            cluster_futures = []
+            for index, (x1, x2) in enumerate(cluster_v_cluster):
+                future = executor.submit(self.compute_ovo, x1, x2)
+                cluster_futures.append((index, future))
+            
+            # Recoger resultados de sample comparisons
+            for index, future in sample_futures:
+                sample_matrix[0, index, :, :] = future.result()
+            
+            # Recoger resultados de cluster comparisons
+            for index, future in cluster_futures:
+                kw_sample_index = index // len(cluster)
+                kw_sample_vs_index = index % len(cluster)
+                cluster_matrix[kw_sample_index, kw_sample_vs_index, :, :] = future.result()
+        
+        if self.get_sigma:
+            sigma = self.compute_sigma(samples=cluster)
+        
+        return sample_matrix, cluster_matrix, sigma 
+        
+    def __ova_serie__(self, sample: str, cluster: List[str]) -> Tuple[np.ndarray, np.ndarray, float]:
 
         sigma = float('inf')
 
@@ -234,7 +281,16 @@ class CompressionMatrix:
             )
 
         return sample_matrix, cluster_matrix, sigma
-
+    
+    def compute_ova(self, sample: str, cluster: List[str]) -> Tuple[np.ndarray, np.ndarray, float]:
+        
+        cluster_ = sorted(cluster)
+        
+        if self.workers > 1:
+            return self.__ova_threads__(sample, cluster_)
+        else:
+            return self.__ova_serie__(sample, cluster_)
+    
     def get_one_compression_matrix(self, sample: str, kw_samples: Dict[Union[int, str], List[str]]) ->  Dict[str, np.ndarray]:
 
         if not isinstance(kw_samples, dict):
@@ -260,7 +316,7 @@ class CompressionMatrix:
                 seq_lengths.extend(len(s) for s in v if isinstance(s, str))
 
         results = {}
-
+        
         for cluster_key, cluster_values in kw_samples.items():
             sample_matrix, cluster_matrix, sigma = self.compute_ova(
                 sample=sample,

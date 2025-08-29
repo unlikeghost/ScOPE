@@ -15,9 +15,9 @@ from scope.utils import make_report, SampleGenerator, ScOPEOptimizerAuto
 # Config
 # -------------------
 TEST_SAMPLES = 3
-TRIALS = 100
+TRIALS = 1000
 CVFOLDS = 5
-TARGET_METRIC = "mcc"
+TARGET_METRIC = "log_loss"
 
 STUDY_NAME = "Clintox"
 SMILES_COLUMN = "smiles"
@@ -38,7 +38,7 @@ random.seed(RANDOM_SEED)
 # -------------------
 def preprocess_smiles(smiles: str) -> str | None:
     """Canonicalize and clean a SMILES string. Returns None if invalid."""
-    
+
     try:
         mol = Chem.MolFromSmiles(smiles)
         if mol is None:
@@ -58,9 +58,9 @@ def preprocess_smiles(smiles: str) -> str | None:
         # Quitar duplicados y unir
         unique_reps = list(set(representations))
         combined = " |JOIN| ".join(unique_reps)
-                
+
         return combined
-        
+
     except Exception:
         return None
 
@@ -103,13 +103,14 @@ search_generator = SampleGenerator(
 )
 
 optimizer = ScOPEOptimizerAuto(
-    free_cpu=0,
+    n_jobs=1,
     n_trials=TRIALS,
     random_seed=RANDOM_SEED,
     target_metric=TARGET_METRIC,
     study_name=STUDY_NAME,
     output_path=ANALYSIS_RESULTS_PATH,
-    cv_folds=CVFOLDS
+    cv_folds=CVFOLDS,
+    use_cache=False
 )
 
 
@@ -121,8 +122,8 @@ for x_search_i, y_search_i, search_kw_samples_i in search_generator.generate(num
     search_all_x.append(x_search_i)
     search_all_y.append(y_search_i)
     search_all_kw.append(search_kw_samples_i)
-    
-    
+
+
 study = optimizer.optimize(
     search_all_x,
     search_all_y,
@@ -144,28 +145,28 @@ test_all_y_predicted = []
 test_all_y_probas = []
 
 for x_test_i, y_test_i, test_kw_samples_i in test_generator.generate(num_samples=TEST_SAMPLES):
-    
+
     predx = best_model(
         samples=x_test_i,
         kw_samples=test_kw_samples_i
     )[0]
-    
+
     prediction: dict = predx['probas']
-    
+
     sorted_dict = OrderedDict(sorted(prediction.items()))
 
-    pred_key = max(sorted_dict, key=sorted_dict.get) 
-    
+    pred_key = max(sorted_dict, key=sorted_dict.get)
+
     predicted_class = int(pred_key.replace("sample_", ""))
-    
+
     test_all_y_predicted.append(
         predicted_class
     )
-    
+
     test_all_y_probas.append(
         list(sorted_dict.values())
     )
-    
+
     test_all_y_true.append(
         y_test_i
     )

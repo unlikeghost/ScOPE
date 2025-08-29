@@ -21,7 +21,7 @@ class ScOPEOptimizer(ABC):
 
     def __init__(self,
                  parameter_space: Optional[ParameterSpace] = None, 
-                 free_cpu: int = 0,
+                 n_jobs: int = 1,
                  random_seed: int = 42,
                  cv_folds: int = 3,
                  study_name: str = "scope_optimization",
@@ -33,9 +33,8 @@ class ScOPEOptimizer(ABC):
         
         self.parameter_space = parameter_space or ParameterSpace()
         
-        _os_cpu = os.cpu_count() or 0
         
-        self.n_jobs = max(1, _os_cpu - free_cpu)
+        self.n_jobs = n_jobs
         self.random_seed: int = random_seed
         self.cv_folds = cv_folds
         self.study_date = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -122,6 +121,7 @@ class ScOPEOptimizer(ABC):
             'compression_metric_names': compression_metric_names,
             'join_string': params['join_string'],
             'get_sigma': params['get_sigma'],
+            'n_jobs': 4
         }
         
         model_type = params['model_type']

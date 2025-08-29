@@ -17,6 +17,7 @@ class ScOPE:
                  compression_level: int = 9,
                  join_string: str = '',
                  get_sigma: bool = True,
+                 n_jobs: int = -1,
                  **model_kwargs
                  ):
         
@@ -32,6 +33,7 @@ class ScOPE:
             compression_level=compression_level,
             join_string=join_string,
             get_sigma=get_sigma,
+            n_jobs=n_jobs
         )
         
         self._model_type = model_type

@@ -9,13 +9,13 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 # -------------------- Dataset de validación --------------------
 x_validation = [
-    "molecule toxic heavy metal lead", "compound dangerous poison arsenic", 
+    "molecule toxic heavy metal lead", "compound dangerous poison arsenic",
     "chemical harmful mercury substance", "element toxic cadmium dangerous",
     "poison lethal cyanide compound", "toxic substance benzene harmful",
     "dangerous chemical formaldehyde", "harmful compound asbestos fiber",
     "toxic metal chromium dangerous", "poison substance strychnine lethal",
     "harmful chemical dioxin toxic", "dangerous compound pesticide toxic",
-    
+
     "safe molecule water oxygen", "harmless compound sugar glucose",
     "beneficial substance vitamin C", "safe chemical sodium chloride",
     "harmless element calcium safe", "beneficial compound protein amino",
@@ -28,7 +28,7 @@ y_validation = [0]*12 + [1]*12
 
 kw_samples_validation = [
     {
-        0: ["toxic harmful dangerous poison lethal", "mercury lead arsenic cyanide"], 
+        0: ["toxic harmful dangerous poison lethal", "mercury lead arsenic cyanide"],
         1: ["safe harmless beneficial healthy natural", "water vitamin protein calcium"]
     }
     for _ in range(24)
@@ -36,7 +36,7 @@ kw_samples_validation = [
 
 # -------------------- Dataset para búsqueda de parámetros (entrenamiento) --------------------
 x_train = [
-    "chemical toxic pesticide harmful", "dangerous metal arsenic lead", 
+    "chemical toxic pesticide harmful", "dangerous metal arsenic lead",
     "poisonous substance cyanide lethal", "harmful compound mercury cadmium",
     "toxic gas formaldehyde dangerous", "dangerous substance dioxin poison",
     "safe molecule water glucose", "beneficial compound vitamin protein",
@@ -48,7 +48,7 @@ y_train = [0]*6 + [1]*6
 
 kw_samples_train = [
     {
-        0: ["toxic harmful dangerous poison lethal", "mercury lead arsenic cyanide"], 
+        0: ["toxic harmful dangerous poison lethal", "mercury lead arsenic cyanide"],
         1: ["safe harmless beneficial healthy natural", "water vitamin protein calcium"]
     }
     for _ in range(12)
@@ -57,9 +57,10 @@ kw_samples_train = [
 # -------------------- Optimización --------------------
 optimizer = ScOPEOptimizerAuto(
     random_seed=42,
-    n_trials=100,
+    n_trials=1000,
     target_metric='log_loss',
-    study_name="parameter_search"
+    study_name="parameter_search",
+    use_cache=False,
 )
 
 study = optimizer.optimize(x_train, y_train, kw_samples_train)

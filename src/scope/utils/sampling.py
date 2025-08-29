@@ -38,7 +38,7 @@ class SampleGenerator:
         if len(self.data) != len(self.labels):
             raise ValueError("Data and labels must have the same length.")
 
-        self.unique_classes = (
+        self.unique_classes = np.sort(
             np.unique([tuple(lbl) for lbl in self.labels]) if len(self.labels.shape) > 1 else np.unique(self.labels)
         )
 
@@ -63,7 +63,14 @@ class SampleGenerator:
         if num_samples >= len(self.data):
             raise ValueError("num_samples must be less than the number of instances.")
         
-        
+        if self.seed is not None:
+            self.rng = np.random.RandomState(self.seed)
+            indices_order = np.arange(len(self.data))
+            self.rng.shuffle(indices_order)
+        else:
+            indices_order = np.arange(len(self.data))
+
+            
         min_class_size = min(self.class_counts.values())
         available_samples_per_class = min_class_size - 1  # -1 because we exclude the target sample
         
@@ -77,18 +84,19 @@ class SampleGenerator:
             )
             replace = True
         
-        for index in range(len(self.data)):
+        for index in indices_order:
             expected_label: np.ndarray = self.labels[index]
             sample_to_predict: np.ndarray = self.data[index]
 
             current_kw_samples: Dict[str, np.ndarray] = {
                 cls: np.zeros((num_samples, len(self.data)))
-                for cls in self.unique_classes
+                for cls in sorted(self.unique_classes)
             }
 
-            for cls in self.unique_classes:
+            for cls in sorted(self.unique_classes):
                 mask = np.where(self.labels == cls)[0]
                 mask = mask[mask != index]  # Excluir el índice actual
+                mask = np.sort(mask)
                 
                 sampled_indices = self.rng.choice(mask, size=num_samples, replace=replace)
 
