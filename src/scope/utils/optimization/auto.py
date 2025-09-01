@@ -12,6 +12,7 @@ from .params import ParameterSpace
 
 warnings.filterwarnings("ignore", category=optuna.exceptions.ExperimentalWarning)
 
+
 class ScOPEOptimizerAuto(ScOPEOptimizer):
     """Automatic sampler selection optimization for ScOPE models using AutoSampler."""
     
@@ -115,12 +116,13 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
         
         compressor_names = self.best_params['compressor_names'].split(',')
         compression_metric_names = self.best_params['compression_metric_names'].split(',')
+        evaluation_metrics_names = self.best_params['evaluation_metric'].split(',')
         
         is_ensemble = len(compressor_names) > 1 or len(compression_metric_names) > 1
         
-        print(f"Best model type: {self.best_params.get('model_type', 'unknown')}")
         print(f"Compressors: {compressor_names}")
         print(f"Compression metrics: {compression_metric_names}")
+        print(f"Evaluation metrics: {evaluation_metrics_names}")
         
         if is_ensemble:
             print("Ensemble configuration detected")
@@ -129,15 +131,6 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
         if aggregation_method is not None:
             print(f"Aggregation method: {aggregation_method}")
         
-        model_type = self.best_params.get('model_type')
-        if model_type == 'ot':
-            matching_metric = self.best_params.get('matching_metric')
-            if matching_metric:
-                print(f"Matching metric (OT): {matching_metric}")
-        elif model_type == 'pd':
-            distance_metric = self.best_params.get('distance_metric')
-            if distance_metric:
-                print(f"Distance metric (PD): {distance_metric}")
         
         self._analyze_auto_sampler_performance()
         
@@ -265,13 +258,6 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             print("-" * 50)
             
             basic_params = {}
-            model_specific_params = {}
-            
-            for param, importance in importances.items():
-                if param in ['matching_metric', 'distance_metric']:
-                    model_specific_params[param] = importance
-                else:
-                    basic_params[param] = importance
             
             if basic_params:
                 print("Basic Parameters:")
@@ -279,11 +265,6 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
                     print(f"  {param}: {importance:.6f}")
                 print()
             
-            if model_specific_params:
-                print("Model-Specific Parameters:")
-                for param, importance in sorted(model_specific_params.items(), key=lambda x: x[1], reverse=True):
-                    print(f"  {param}: {importance:.6f}")
-                print()
             
             print("Overall Ranking (Top 10 - AutoSampler prioritized):")
             top_params = sorted(importances.items(), key=lambda x: x[1], reverse=True)[:10]
@@ -357,11 +338,9 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             f.write(f"Compression metric combinations: {len(self.parameter_space.compression_metric_names_options)}\n")
             f.write(f"Join string options: {self.parameter_space.concat_value_options}\n")
             f.write(f"Get sigma options: {self.parameter_space.get_sigma_options}\n")
-            f.write(f"Model types: {self.parameter_space.model_types_options}\n")
+            f.write(f"Model evaluation metrics: {self.parameter_space.evaluation_metrics}\n")
             f.write(f"Aggregation methods: {self.parameter_space.aggregation_method_options}\n")
-            f.write(f"Distance metrics (PD): {self.parameter_space.distance_metrics}\n")
-            f.write(f"Matching metrics (OT): {self.parameter_space.matching_metrics}\n\n")
-            
+
         print(f"AutoSampler analysis report saved to {filepath}")
     
     def save_complete_analysis(self):

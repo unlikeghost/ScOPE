@@ -4,27 +4,25 @@ from copy import deepcopy
 from typing import Union, List, Optional, Dict, Any
 
 from .compression import CompressionMatrix
-from .predictor import PredictorRegistry, _BasePredictor
+from .predictor import _BasePredictor, ScOPEPredictor
 
 
 class ScOPE:
     
     def __init__(self,
-                 model_type: str,
+                 evaluation_metric: str = 'squared_euclidean',
                  aggregation_method: Optional[str] = None,
                  compressor_names: Union[str, List[str]] = 'gzip',
                  compression_metric_names: Union[str, List[str]] = 'ncd',
                  compression_level: int = 9,
                  join_string: str = '',
                  get_sigma: bool = True,
-                 n_jobs: int = -1,
-                 **model_kwargs
+                 n_jobs: int = 5,
                  ):
         
-        self.predictor: _BasePredictor = PredictorRegistry.create(
-            name=model_type,
+        self.predictor: _BasePredictor = ScOPEPredictor(
             aggregation_method=aggregation_method,
-            **model_kwargs
+            evaluation_metric=evaluation_metric
         )
         
         self.compression_matrix: CompressionMatrix = CompressionMatrix(
@@ -36,11 +34,8 @@ class ScOPE:
             n_jobs=n_jobs
         )
         
-        self._model_type = model_type
+        self._evaluation_metric = evaluation_metric
         self._aggregation_method = aggregation_method
-        self._model_args = self._coerce_kwargs_to_serializable(
-            model_kwargs
-        )
 
         self._compressor_names = compressor_names
         self._compression_metric_names = compression_metric_names
@@ -63,9 +58,8 @@ class ScOPE:
             'compression_level': self._compression_level,
             'join_string': self._join_string,
             'get_sigma': self._get_sigma,
-            'model_type': self._model_type,
+            'evaluation_metric': self._evaluation_metric,
             'aggregation_method': self._aggregation_method,
-            'model_kwargs': self._model_args
         }
         
         return params

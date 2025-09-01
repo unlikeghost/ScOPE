@@ -1,11 +1,25 @@
 from typing import List
 from collections import OrderedDict
+
 from scope.utils import make_report
 from scope.utils import ScOPEOptimizerAuto
+from scope.compression.compressors import CompressorType
+from scope.utils.optimization.params import ParameterSpace, all_subsets
 
 import warnings
 
 warnings.filterwarnings("ignore", category=UserWarning)
+
+compressors = all_subsets([c.value for c in CompressorType if c != CompressorType.SMILEZ])
+dissimilarity_metrics = all_subsets([
+    'ncd', 'ucd', 'cd', 'ncc'
+])
+
+params = ParameterSpace(
+    compressor_names_options=compressors,
+    concat_value_options=[''],
+    compression_metric_names_options=dissimilarity_metrics
+)
 
 # -------------------- Dataset de validación --------------------
 x_validation = [
@@ -57,10 +71,12 @@ kw_samples_train = [
 # -------------------- Optimización --------------------
 optimizer = ScOPEOptimizerAuto(
     random_seed=42,
-    n_trials=1000,
+    n_trials=100,
     target_metric='log_loss',
     study_name="parameter_search",
-    use_cache=False,
+    use_cache=True,
+    n_jobs=1,
+    parameter_space=params
 )
 
 study = optimizer.optimize(x_train, y_train, kw_samples_train)
@@ -91,6 +107,7 @@ results = make_report(
     y_true=all_y_true,
     y_pred=all_y_predicted,
     y_pred_proba=all_y_probas,
+    save_path='results'
 )
 
 print(results)

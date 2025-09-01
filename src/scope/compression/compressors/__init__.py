@@ -2,9 +2,8 @@ from enum import Enum
 from typing import Union
 
 from .base_ import BaseCompressor
-from .smiles import SmilezCompressor
 from .custom import RLECompressor, LZ77Compressor
-from .integrated import Bz2Compressor, GZipCompressor, ZlibCompressor, SmazCompressor
+from .integrated import Bz2Compressor, GZipCompressor, ZlibCompressor, SmazCompressor, SmilezCompressor
 
 
 class CompressorType(Enum):

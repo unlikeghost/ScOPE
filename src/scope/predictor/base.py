@@ -14,7 +14,6 @@ class _BasePredictor(ABC):
         "mean": lambda data: np.mean(data, axis=0),
         "median": lambda data: np.median(data, axis=0),
         "sum": lambda data: np.sum(data, axis=0),
-        "average": lambda data: np.average(data, axis=0),
         "gmean": lambda data: gmean(data, axis=0)
     }
     

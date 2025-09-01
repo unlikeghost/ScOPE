@@ -1,32 +1,47 @@
 import os
 import random
-import warnings
 import numpy as np
 import pandas as pd
 import deepchem as dc
 from rdkit import Chem
 from collections import OrderedDict
+import tomllib
 
+from scope.compression.compressors import CompressorType
+from scope.utils.optimization.params import ParameterSpace, all_subsets
 from scope.utils import make_report, SampleGenerator, ScOPEOptimizerAuto
 
-# warnings.filterwarnings("ignore", category=UserWarning)
+compressors = all_subsets([c.value for c in CompressorType if c != CompressorType.SMILEZ])
+dissimilarity_metrics = all_subsets([
+    'ncd', 'ucd', 'cd', 'ncc'
+])
+
+params = ParameterSpace(
+    compressor_names_options=compressors,
+    compression_metric_names_options=dissimilarity_metrics
+)
+
 
 # -------------------
-# Config
+# Load Config from TOML
 # -------------------
-TEST_SAMPLES = 3
-TRIALS = 1000
-CVFOLDS = 5
-TARGET_METRIC = "log_loss"
+with open("settings.toml", "rb") as f:
+    config = tomllib.load(f)
 
-STUDY_NAME = "Clintox"
-SMILES_COLUMN = "smiles"
-LABEL_COLUMN = "ct_tox"
+# Extract config values
+TEST_SAMPLES = config["experiment"]["test_samples"]
+TRIALS = config["experiment"]["trials"] 
+CVFOLDS = config["experiment"]["cvfolds"]
+TARGET_METRIC = config["experiment"]["target_metric"]
+USE_CACHE = config["experiment"]["use_cache"]
+STUDY_NAME = f"{config["experiment"]["study_name"]}_Cache_{USE_CACHE}"
+RANDOM_SEED = config["experiment"]["random_seed"]
 
-RANDOM_SEED = 42
+SMILES_COLUMN = config["dataset"]["smiles_column"]
+LABEL_COLUMN = config["dataset"]["label_column"]
 
-RESULTS_PATH = os.path.join("results")
-ANALYSIS_RESULTS_PATH = os.path.join(RESULTS_PATH)
+RESULTS_PATH = config["paths"]["results_path"]
+ANALYSIS_RESULTS_PATH = RESULTS_PATH
 EVALUATION_RESULTS_PATH = os.path.join(RESULTS_PATH, str(TEST_SAMPLES), "Evaluation")
 
 np.random.seed(RANDOM_SEED)
@@ -110,7 +125,8 @@ optimizer = ScOPEOptimizerAuto(
     study_name=STUDY_NAME,
     output_path=ANALYSIS_RESULTS_PATH,
     cv_folds=CVFOLDS,
-    use_cache=False
+    use_cache=USE_CACHE,
+    parameter_space=params
 )
 
 

@@ -9,6 +9,7 @@ import numpy as np
 import multiprocessing
 import concurrent.futures
 from itertools import product
+from concurrent.futures import as_completed
 from scipy.stats.mstats import hmean
 from typing import Union, List, Dict, Tuple
 
@@ -18,7 +19,7 @@ from .dissimilarity import compute_compression_metric
 
 class CompressionMatrix:
     epsilon: float = 1e-4
-        
+
     compressors = {
         'bz2': 0,
         'zlib': 1,
@@ -42,11 +43,11 @@ class CompressionMatrix:
                  compressor_names: Union[str, List[str]] = 'gzip',
                  compression_metric_names: Union[str, List[str]] = 'ncd',
                  compression_level: int = 9,
-                 join_string: str = "|||ScOPE_SEPARATOR_BOUNDARY|||",
+                 join_string: str = ' ',
                  get_sigma: bool = True,
-                 n_jobs: int = -1
+                 n_jobs: int = 6
                  ):
-                     
+
         if isinstance(compressor_names, str):
             compressor_names = [compressor_names]
 
@@ -77,33 +78,33 @@ class CompressionMatrix:
         self.compressor_names = set(compressor_names)
         self.compression_metric_names = set(compression_metric_names)
         self.get_sigma = get_sigma
-        
+
         self._total_compressors = len(self.compressors)
         self._total_metrics = len(self.compression_metrics)
-        
+
         self._n_compressors = len(self.compressor_names)
         self._n_metrics = len(self.compression_metric_names)
-        
+
         if n_jobs == -1:
            self.workers = multiprocessing.cpu_count()
         else:
             self.workers = min(multiprocessing.cpu_count(), n_jobs)
-        
+
     def __get_compression_size__(self, sequence: Union[str, bytes], compressor: str) -> int:
         """Comprime un string y retorna solo el tamaño"""
         if len(sequence) == 0:
             raise ValueError(f"WARNING: Empty sequence for compression with {compressor}")
-                            
+
         compressed_sequence = compute_compression(
             sequence=sequence,
             compressor=compressor,
             compression_level=self.compression_level,
         )
-        
+
         c_sequence = len(compressed_sequence)
 
         return c_sequence
-    
+
     def __compute_dissimilarity_metric__(self, c_x1: float, c_x2: float, c_x1x2: float, c_x2x1: float, metric: str) -> float:
 
         _score = compute_compression_metric(
@@ -113,7 +114,7 @@ class CompressionMatrix:
             c_x2x1=c_x2x1,
             metric=metric
         )
-        
+
         if _score <= 0:
             warnings.warn(
                 f"Expected disimilarity score <= 0, but got {_score}"
@@ -122,17 +123,17 @@ class CompressionMatrix:
             )
 
         return _score
-                
+
     def compute_sigma(self, samples: List[str]) -> float:
 
         def _compute(x1: str) -> List[float]:
             sigmas: list = []
             x1x2 = self.join_string.join([x1, x1])
-            
+
             for compressor in self.compressor_names:
                 c_x1 = self.__get_compression_size__(x1, compressor)
                 c_x1x2 = self.__get_compression_size__(x1x2, compressor)
-                
+
                 for metric in self.compression_metric_names:
                     _score = self.__compute_dissimilarity_metric__(
                         c_x1=c_x1,
@@ -141,14 +142,14 @@ class CompressionMatrix:
                         c_x2x1=c_x1x2,
                         metric=metric
                     )
-                    
+
                     sigmas.append(max(_score, self.epsilon))
 
             return sigmas
         sigmas = np.array([_compute(sample) for sample in samples]).flatten()
-        
+
         sigma = hmean(sigmas)
-        
+
         return sigma.item()
 
     def compute_ovo(self, x1: str, x2: str) -> np.ndarray:
@@ -160,12 +161,12 @@ class CompressionMatrix:
             ),
             fill_value=np.nan
         )
-        
+
         x1x2 = self.join_string.join([x1, x2])
         x2x1 = self.join_string.join([x2, x1])
-        
+
         sequences = [x1, x2, x1x2, x2x1]
-        
+
         for compressor in self.compressor_names:
             compressor_index = self.compressors[compressor]
             compressed_sizes = [
@@ -173,10 +174,10 @@ class CompressionMatrix:
                 for seq in sequences
             ]
             c_x1, c_x2, c_x1x2, c_x2x1 = compressed_sizes
-            
+
             for metric in self.compression_metric_names:
                 metric_index = self.compression_metrics[metric]
-                
+
                 _score = self.__compute_dissimilarity_metric__(
                     c_x1=c_x1,
                     c_x2=c_x2,
@@ -184,9 +185,9 @@ class CompressionMatrix:
                     c_x2x1=c_x2x1,
                     metric=metric
                 )
-                
+
                 matrix_values[compressor_index, metric_index] = _score
-            
+
         nan_mask = ~np.isnan(matrix_values)
 
         result = matrix_values[nan_mask].reshape(
@@ -195,46 +196,53 @@ class CompressionMatrix:
         )
 
         return result
-    
+
     def __ova_threads__(self, sample: str, cluster: List[str]) -> Tuple[np.ndarray, np.ndarray, float]:
         """Versión con ThreadPoolExecutor - menos overhead que multiprocessing"""
         sigma = float('inf')
-        
+    
         combinations = list(product(cluster, repeat=2))
         cluster_v_cluster = combinations[:-len(cluster)]
-        
+    
         sample_matrix = np.zeros((1, len(cluster), self._n_compressors, self._n_metrics))
         cluster_matrix = np.zeros((len(cluster) - 1, len(cluster), self._n_compressors, self._n_metrics))
-        
-        # Usar ThreadPoolExecutor en lugar de multiprocessing.Pool
+    
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.workers) as executor:
             # Sample comparisons
-            sample_futures = []
-            for index, kw_cluster_sample in enumerate(cluster):
-                future = executor.submit(self.compute_ovo, sample, kw_cluster_sample)
-                sample_futures.append((index, future))
-            
+            sample_futures = {
+                executor.submit(self.compute_ovo, sample, kw_cluster_sample): index
+                for index, kw_cluster_sample in enumerate(cluster)
+            }
+    
             # Cluster comparisons
-            cluster_futures = []
-            for index, (x1, x2) in enumerate(cluster_v_cluster):
-                future = executor.submit(self.compute_ovo, x1, x2)
-                cluster_futures.append((index, future))
-            
+            cluster_futures = {
+                executor.submit(self.compute_ovo, x1, x2): index
+                for index, (x1, x2) in enumerate(cluster_v_cluster)
+            }
+    
             # Recoger resultados de sample comparisons
-            for index, future in sample_futures:
-                sample_matrix[0, index, :, :] = future.result()
-            
+            for future in as_completed(sample_futures):
+                index = sample_futures[future]
+                try:
+                    sample_matrix[0, index, :, :] = future.result()
+                except Exception as e:
+                    print(f"Error en sample {index}: {e}")
+    
             # Recoger resultados de cluster comparisons
-            for index, future in cluster_futures:
-                kw_sample_index = index // len(cluster)
-                kw_sample_vs_index = index % len(cluster)
-                cluster_matrix[kw_sample_index, kw_sample_vs_index, :, :] = future.result()
-        
+            for future in as_completed(cluster_futures):
+                index = cluster_futures[future]
+                try:
+                    kw_sample_index = index // len(cluster)
+                    kw_sample_vs_index = index % len(cluster)
+                    cluster_matrix[kw_sample_index, kw_sample_vs_index, :, :] = future.result()
+                except Exception as e:
+                    print(f"Error en cluster comparison {index}: {e}")
+    
         if self.get_sigma:
             sigma = self.compute_sigma(samples=cluster)
-        
-        return sample_matrix, cluster_matrix, sigma 
-        
+    
+        return sample_matrix, cluster_matrix, sigma
+
     def __ova_serie__(self, sample: str, cluster: List[str]) -> Tuple[np.ndarray, np.ndarray, float]:
 
         sigma = float('inf')
@@ -281,16 +289,16 @@ class CompressionMatrix:
             )
 
         return sample_matrix, cluster_matrix, sigma
-    
+
     def compute_ova(self, sample: str, cluster: List[str]) -> Tuple[np.ndarray, np.ndarray, float]:
-        
+
         cluster_ = sorted(cluster)
-        
+
         if self.workers > 1:
             return self.__ova_threads__(sample, cluster_)
         else:
             return self.__ova_serie__(sample, cluster_)
-    
+
     def get_one_compression_matrix(self, sample: str, kw_samples: Dict[Union[int, str], List[str]]) ->  Dict[str, np.ndarray]:
 
         if not isinstance(kw_samples, dict):
@@ -316,7 +324,7 @@ class CompressionMatrix:
                 seq_lengths.extend(len(s) for s in v if isinstance(s, str))
 
         results = {}
-        
+
         for cluster_key, cluster_values in kw_samples.items():
             sample_matrix, cluster_matrix, sigma = self.compute_ova(
                 sample=sample,
@@ -338,7 +346,7 @@ class CompressionMatrix:
                 f"'samples' and 'kw_samples' must have the same length "
                 f"(got {len(samples)} and {len(kw_samples)})."
             )
-            
+
         return [
             self.get_one_compression_matrix(sample, kw_sample)
             for sample, kw_sample in zip(samples, kw_samples)

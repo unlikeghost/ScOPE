@@ -25,27 +25,18 @@ class ParameterSpace:
     )
     
     concat_value_options: List[str] = field(
-        default_factory= lambda: [' ', '\n', '||SEP_SAFE_DELIM_SEP|||']
-    )
-    
-    model_types_options: List[str] = field(
-        default_factory=lambda: ["ot", "pd"]
+        default_factory= lambda: [' ', '||SEP_SAFE_DELIM_SEP|||']
     )
     
     aggregation_method_options: List[str] = field(
-        default_factory= lambda: ['mean', 'median', 'sum', 'average', 'gmean', '']
+        default_factory= lambda: ['mean', 'median', 'sum', 'gmean', '']
     )
 
-    # Booleanos
     get_sigma_options: List[bool] = field(
         default_factory=lambda: [True, False]
     )
 
-    # Específicos por tipo de modelo
-    matching_metrics: List[str] = field(
-        default_factory=lambda: ["jaccard", "dice", "overlap", '']
+    evaluation_metrics: List[str] = field(
+        default_factory=lambda: ["squared_euclidean", "wasserstein", "wasserstein-jaccard", "wasserstein-dice", "wasserstein-overlap"]
     )
     
-    distance_metrics: List[str] = field(
-        default_factory=lambda: ["manhattan", "euclidean", "squared_euclidean", "chebyshev"]
-    )

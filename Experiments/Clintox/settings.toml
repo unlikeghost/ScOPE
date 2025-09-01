@@ -1,0 +1,15 @@
+[experiment]
+test_samples = 3
+trials = 100
+use_cache = true
+study_name = "clintox"
+target_metric = "log_loss"
+cvfolds = 5
+random_seed = 42
+
+[dataset]
+smiles_column = "smiles"
+label_column = "ct_tox"
+
+[paths]
+results_path = "results"

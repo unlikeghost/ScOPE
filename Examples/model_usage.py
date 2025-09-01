@@ -22,9 +22,8 @@ test_samples = {
 test_sample_pos = "Fantástica película que combina acción emocionante con momentos de gran profundidad emocional. Los actores entregan performances convincentes y la dirección mantiene un ritmo perfecto throughout."
 
 model = ScOPE(
-    model_type='pd',
-    aggregation_method='average',
-    distance_metric='squared_euclidean',
+    aggregation_method='mean',
+    evaluation_metric='wasserstein-dice',
     compressor_names=['bz2', 'zlib'],
     compression_metric_names=['cd'],
     compression_level=9,

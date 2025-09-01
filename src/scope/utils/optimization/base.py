@@ -4,16 +4,95 @@ import json
 import hashlib
 import numpy as np
 from datetime import datetime
-from typing import List, Dict, Optional, Any, Union
+from typing import List, Dict, Optional, Any, Union, Tuple
 from abc import ABC, abstractmethod
 from sklearn.model_selection import StratifiedKFold
 from collections import OrderedDict
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import optuna
 
 from scope.model import ScOPE
 from scope.utils.report_generation import make_report
 from .params import ParameterSpace
+
+
+def _evaluate_single_fold(fold_data: Tuple, model_params: Dict, class_to_idx: Dict, unique_classes: List) -> Dict[str, float]:
+    """
+    Evaluate a single fold in parallel - handles batch processing.
+    This function will be executed in a separate process/thread.
+    """
+    fold_idx, X_val, y_val, kw_val = fold_data
+    model = ScOPE(**model_params)
+    fold_predictions = []
+    fold_probas = []
+    predictions_batch = model(samples=X_val, kw_samples=kw_val)
+    try:        
+        
+        for i, predictions in enumerate(predictions_batch):
+            try:
+                if isinstance(predictions, dict):
+                    prediction = predictions
+                elif isinstance(predictions, list) and len(predictions) > 0:
+                    prediction = predictions[0]
+                else:
+                    raise ValueError("Unexpected prediction format")
+                
+                predicted_class_str = prediction.get('predicted_class', '0')
+                try:
+                    predicted_class = int(predicted_class_str)
+                except (ValueError, TypeError):
+                    predicted_class = unique_classes[0]
+                
+                probs: dict = prediction.get('probas', {})
+                probs = OrderedDict(sorted(probs.items()))
+                proba_values = list(probs.values())
+                
+                if len(proba_values) != 2:
+                    raise ValueError(f"Expected 2 class probabilities, got {len(proba_values)}")
+                
+                fold_predictions.append(predicted_class)
+                fold_probas.append(proba_values)
+                
+            except Exception as e:
+                print(f"Warning: Prediction failed for fold {fold_idx}, sample {i}: {e}")
+                fold_predictions.append(unique_classes[0])
+                fold_probas.append([0.5, 0.5])
+
+        # Process results
+        y_val_numeric = [class_to_idx[y] for y in y_val[:len(fold_predictions)]]
+        y_pred_numeric = [class_to_idx.get(pred, 0) for pred in fold_predictions]
+        y_pred_proba_array = np.array(fold_probas)
+        
+        fold_scores = {
+            'accuracy': 0.0, 'balanced_accuracy': 0.0, 'f1': 0.0, 'f2': 0.0,
+            'auc_roc': 0.5, 'auc_pr': 0.5, 'log_loss': 1.0, 'mcc': -1.0
+        }
+        
+        if len(set(y_pred_numeric)) > 1 and len(set(y_val_numeric)) > 1:
+            try:
+                report = make_report(y_val_numeric, y_pred_numeric, y_pred_proba_array)
+                fold_scores = {
+                    'accuracy': report['accuracy'],
+                    'balanced_accuracy': report['balanced_accuracy'],
+                    'f1': report['f1'],
+                    'f2': report['f2'],
+                    'auc_roc': report['auc_roc'],
+                    'auc_pr': report['auc_pr'],
+                    'log_loss': report['log_loss'],
+                    'mcc': report['mcc']
+                }
+            except Exception as e:
+                print(f"Warning: Metric computation failed for fold {fold_idx}: {e}")
+        
+        return fold_scores
+        
+    except Exception as e:
+        print(f"Error in fold {fold_idx}: {e}")
+        return {
+            'accuracy': 0.0, 'balanced_accuracy': 0.0, 'f1': 0.0, 'f2': 0.0,
+            'auc_roc': 0.5, 'auc_pr': 0.5, 'log_loss': 1.0, 'mcc': -1.0
+        }
 
 
 class ScOPEOptimizer(ABC):
@@ -87,15 +166,8 @@ class ScOPEOptimizer(ABC):
         print(f"  • Compression metric combinations ({len(self.parameter_space.compression_metric_names_options)})")
         print(f"  • Join string options ({len(self.parameter_space.concat_value_options)}): {[repr(s) for s in self.parameter_space.concat_value_options]}")
         print(f"  • Get sigma options: {self.parameter_space.get_sigma_options}")
-        print(f"  • Model types: {self.parameter_space.model_types_options}")
         print(f"  • Aggregation methods: {self.parameter_space.aggregation_method_options}")
-        
-        print("\nMODEL-SPECIFIC PARAMETERS:")
-        print("  ScOPE-OT:")
-        print(f"    • Matching metrics: {self.parameter_space.matching_metrics}")
-        
-        print("  ScOPE-PD:")
-        print(f"    • Distance metrics: {self.parameter_space.distance_metrics}")
+        print(f"  • Evaluation Metrics ({len(self.parameter_space.evaluation_metrics)})")
         
         print("=" * 60)
         
@@ -115,8 +187,8 @@ class ScOPEOptimizer(ABC):
             aggregation_method = None
         
         base_params = {
-            'model_type': params['model_type'],
             'aggregation_method': aggregation_method,
+            'evaluation_metric': params['evaluation_metric'],
             'compressor_names': compressor_names,
             'compression_metric_names': compression_metric_names,
             'join_string': params['join_string'],
@@ -124,22 +196,6 @@ class ScOPEOptimizer(ABC):
             'n_jobs': 4
         }
         
-        model_type = params['model_type']
-        
-        if model_type == "ot":
-            matching_metric = params.get('matching_metric')
-            if matching_metric is not None:
-                if not isinstance(matching_metric, str) or matching_metric == 'True' or matching_metric == 'False':
-                    matching_metric = None
-                base_params['matching_metric'] = matching_metric
-            else:
-                base_params['matching_metric'] = None
-                
-        elif model_type == "pd":
-            distance_metric = params.get('distance_metric')
-            if distance_metric is not None and isinstance(distance_metric, str):
-                base_params['distance_metric'] = distance_metric
-
         return ScOPE(**base_params)
     
     def suggest_categorical_params(self, trial) -> Dict[str, Any]:
@@ -154,9 +210,9 @@ class ScOPEOptimizer(ABC):
                 'join_string', 
                 self.parameter_space.concat_value_options
             ),
-            'model_type': trial.suggest_categorical(
-                'model_type',
-                self.parameter_space.model_types_options
+            'evaluation_metric': trial.suggest_categorical(
+                'evaluation_metric',
+                self.parameter_space.evaluation_metrics
             ),
             'aggregation_method': None if aggregation_method == '' else aggregation_method
         }
@@ -186,27 +242,6 @@ class ScOPEOptimizer(ABC):
             'compressor_names': compressor_string,
             'compression_metric_names': metric_string
         }
-    
-    def suggest_model_specific_params(self, trial, model_type: str) -> Dict[str, Any]:
-        """Suggest model-specific parameters ONLY for the selected model type."""        
-        params = {}
-                
-        if model_type == "ot":
-            matching_metric = trial.suggest_categorical(
-                'matching_metric',
-                self.parameter_space.matching_metrics
-            )
-            params['matching_metric'] = None if matching_metric == '' else matching_metric
-            
-        elif model_type == "pd":
-            distance_metric = trial.suggest_categorical(
-                'distance_metric',
-                self.parameter_space.distance_metrics
-            )
-            if distance_metric != '':
-                params['distance_metric'] = distance_metric
-        
-        return params
             
     def suggest_all_params(self, trial) -> Dict[str, Any]:
         """Combine all parameter suggestions."""
@@ -216,151 +251,76 @@ class ScOPEOptimizer(ABC):
         params.update(self.suggest_boolean_params(trial))
         params.update(self.suggest_integer_params(trial))
         params.update(self.suggest_compressor_and_metric_params(trial))
-        params.update(self.suggest_model_specific_params(trial, params['model_type']))
 
         return params
     
-    def evaluate_model(self, 
-                      model: ScOPE,
-                      X_samples: List[str],
-                      y_true: List[str],
-                      kw_samples_list: List[Dict[str, Any]]
-                      ) -> Dict[str, float]:
-        """Evaluate the model using cross-validation."""
-        
+    def evaluate_model(self,
+                       model: ScOPE,
+                       X_samples: List[str],
+                       y_true: List[str],
+                       kw_samples_list: List[Dict[str, Any]]
+                       ) -> Dict[str, float]:
+        """Evaluate the model using cross-validation (parallel folds)."""
+    
         if self.use_cache:
             key = self._make_cache_key(model)
             if key in self._eval_cache:
                 return self._eval_cache[key]
         else:
             key = None
-         
+    
         indices = np.arange(len(X_samples))
         skf = StratifiedKFold(n_splits=self.cv_folds, shuffle=True, random_state=self.random_seed)
-        
-        cv_scores = {
-            'accuracy': [],
-            'balanced_accuracy': [],
-            'f1': [],
-            'f2': [],
-            'auc_roc': [],
-            'auc_pr': [],
-            'log_loss': [],
-            'mcc': []
-        }
-        
+    
         unique_classes = sorted(list(set(y_true)))
         if len(unique_classes) != 2:
             raise ValueError(f"Expected exactly 2 classes, but found {len(unique_classes)}: {unique_classes}")
-        
-        class_to_idx = {unique_classes[0]: 0, unique_classes[1]: 1}
-        
-        try:
-            for fold, (train_idx, val_idx) in enumerate(skf.split(indices, y_true)):
-                X_val = [X_samples[i] for i in val_idx]
-                y_val = [y_true[i] for i in val_idx]
-                kw_val = [kw_samples_list[i] for i in val_idx]
-                
-                y_pred = []
-                y_pred_proba = []
-                
-                for sample, kw_sample in zip(X_val, kw_val):
-                    try:
-                        predictions = model(samples=sample, kw_samples=kw_sample)
-                        if isinstance(predictions, list) and len(predictions) > 0:
-                            prediction: dict = predictions[0]
-                        else:
-                            raise ValueError("Expected list of predictions")
-                        
-                        predicted_class_str = prediction.get('predicted_class', '0')
-                        try:
-                            predicted_class = int(predicted_class_str)
-                        except (ValueError, TypeError):
-                            predicted_class = 0
-                        
-                        probs: dict = prediction.get('probas', {})
-                        probs = OrderedDict(sorted(probs.items()))
-                        proba_values = list(probs.values())
-                        
-                        if len(proba_values) != 2:
-                            raise ValueError(f"Expected 2 class probabilities, got {len(proba_values)}")
-                        
-                        y_pred.append(predicted_class)
-                        y_pred_proba.append(proba_values)
-                        
-                    except Exception as e:
-                        print('Some error on prediction come up')
-                        print(e)
-                       
-                        random_pred = np.random.randint(0, 2)
-                        y_pred.append(random_pred)
-                        
-                        random_proba = np.random.dirichlet([1, 1])
-                        y_pred_proba.append(random_proba.tolist())
-
-                y_val_numeric = np.array([class_to_idx[cls] for cls in y_val])
-                y_pred_numeric = np.array(y_pred)
-                y_pred_proba_array = np.array(y_pred_proba)
-
-                if len(set(y_pred_numeric)) > 1 and len(set(y_val_numeric)) > 1:
-                    try:
-                        report = make_report(y_val_numeric, y_pred_numeric, y_pred_proba_array)
-                        
-                        cv_scores['accuracy'].append(report['accuracy'])
-                        cv_scores['balanced_accuracy'].append(report['balanced_accuracy'])
-                        cv_scores['f1'].append(report['f1'])
-                        cv_scores['f2'].append(report['f2'])
-                        cv_scores['auc_roc'].append(report['auc_roc'])
-                        cv_scores['auc_pr'].append(report['auc_pr'])
-                        cv_scores['log_loss'].append(report['log_loss'])
-                        cv_scores['mcc'].append(report['mcc'])
-                        
-                    except Exception as e:
-                        print(f"Error en make_report: {e}")
-                        cv_scores['accuracy'].append(0.0)
-                        cv_scores['balanced_accuracy'].append(0.0)
-                        cv_scores['f1'].append(0.0)
-                        cv_scores['f2'].append(0.0)
-                        cv_scores['auc_roc'].append(0.5)
-                        cv_scores['auc_pr'].append(0.5)
-                        cv_scores['log_loss'].append(1.0)
-                        cv_scores['mcc'].append(-1.0)
-                else:
-                    cv_scores['accuracy'].append(0.0)
-                    cv_scores['balanced_accuracy'].append(0.0)
-                    cv_scores['f1'].append(0.0)
-                    cv_scores['f2'].append(0.0)
-                    cv_scores['auc_roc'].append(0.5)
-                    cv_scores['auc_pr'].append(0.5)
-                    cv_scores['log_loss'].append(1.0)
-                    cv_scores['mcc'].append(-1.0)
-        
-        except Exception as e:
-            print(f"Error en evaluación: {e}")
-            return {
-                'balanced_accuracy': 0.0,
-                'accuracy': 0.0,
-                'f1': 0.0,
-                'f2': 0.0,
-                'auc_roc': 0.5,
-                'auc_pr': 0.5,
-                'log_loss': 1.0,
-                'mcc': -1.0
+    
+        class_to_idx = {cls: idx for idx, cls in enumerate(unique_classes)}
+    
+        # Guardamos los parámetros del modelo para instanciar dentro de cada proceso
+        model_params = model.to_dict() if hasattr(model, "to_dict") else {}
+    
+        # Preparar folds
+        fold_data_list = []
+        for fold_idx, (_, val_idx) in enumerate(skf.split(indices, y_true)):
+            X_val = [X_samples[i] for i in val_idx]
+            y_val = [y_true[i] for i in val_idx]
+            kw_val = [kw_samples_list[i] for i in val_idx]
+            fold_data_list.append((fold_idx, X_val, y_val, kw_val))
+    
+        # Ejecutar en paralelo
+        results = []
+        with ProcessPoolExecutor() as executor:
+            futures = {
+                executor.submit(_evaluate_single_fold, fold_data, model_params, class_to_idx, unique_classes): fold_data[0]
+                for fold_data in fold_data_list
             }
-            
-        final_scores: dict = {
-            metric: np.mean(scores) for metric, scores in cv_scores.items()
+            for future in as_completed(futures):
+                fold_idx = futures[future]
+                try:
+                    result = future.result()
+                    results.append(result)
+                except Exception as e:
+                    print(f"Fold {fold_idx} failed: {e}")
+                    results.append({
+                        'accuracy': 0.0, 'balanced_accuracy': 0.0, 'f1': 0.0, 'f2': 0.0,
+                        'auc_roc': 0.5, 'auc_pr': 0.5, 'log_loss': 1.0, 'mcc': -1.0
+                    })
+    
+        # Promediar resultados
+        final_scores = {
+            metric: np.mean([res[metric] for res in results])
+            for metric in results[0]
         }
-        
+    
         if self.use_cache and key is not None:
-            # Limpiar cache si está muy grande
             if len(self._eval_cache) > self._cache_max_size:
                 keep_size = int(self._cache_max_size * 0.8)
                 keys_to_keep = list(self._eval_cache.keys())[-keep_size:]
                 self._eval_cache = {k: self._eval_cache[k] for k in keys_to_keep}
-            
             self._eval_cache[key] = final_scores
-        
+    
         return final_scores
 
     def calculate_objective_score(self, scores: Dict[str, float]) -> float:
@@ -530,7 +490,7 @@ class ScOPEOptimizer(ABC):
             'parameter_space_config': {
                 'compressor_names_options': self.parameter_space.compressor_names_options,
                 'compression_metric_names_options': self.parameter_space.compression_metric_names_options,
-                'model_types_options': self.parameter_space.model_types_options
+                'model_evaluation_metrics': self.parameter_space.evaluation_metrics
             },
             'sqlite_path': f"{self.output_path}/optuna_{self.study_name}.sqlite3"
         }

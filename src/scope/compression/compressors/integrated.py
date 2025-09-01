@@ -8,6 +8,7 @@ import gzip
 import bz2
 import zlib
 import smaz
+import smilez
 
 from .base_ import BaseCompressor
 
@@ -66,4 +67,16 @@ class GZipCompressor(BaseCompressor):
         """Compress using ZLIB algorithm with raw deflate (no headers)."""
         return gzip.compress(sequence, compresslevel=self._compression_level)
         # return zlib.compress(sequence, level=self._compression_level)
+
+
+class SmilezCompressor(BaseCompressor):
+    """Smilez compression algorithm implementation."""
     
+    def __init__(self, compression_level: int = 1):
+        super().__init__(
+            compressor_name="smilez",
+            compression_level=compression_level,
+        )
+
+    def compress(self, sequence: bytes) -> bytes:
+        return smilez.compress(sequence)
