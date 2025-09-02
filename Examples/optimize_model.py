@@ -1,14 +1,35 @@
 from typing import List
 from collections import OrderedDict
-
 from scope.utils import make_report
-from scope.utils import ScOPEOptimizerAuto
+from scope.utils import ScOPEOptimizerRandom, ScOPEOptimizerAuto
 from scope.compression.compressors import CompressorType
 from scope.utils.optimization.params import ParameterSpace, all_subsets
-
 import warnings
 
 warnings.filterwarnings("ignore", category=UserWarning)
+
+
+def create_restricted_parameter_space(promising_space, original_params):
+    """Create restricted parameter space from promising results"""
+    restricted_compressors = []
+    for combo_str in promising_space.get('compressor_names', []):
+        combo_tuple = tuple(combo_str.split(','))
+        restricted_compressors.append(combo_tuple)
+    
+    restricted_metrics = []
+    for combo_str in promising_space.get('compression_metric_names', []):
+        combo_tuple = tuple(combo_str.split(','))
+        restricted_metrics.append(combo_tuple)
+    
+    return ParameterSpace(
+        compressor_names_options=restricted_compressors or original_params.compressor_names_options,
+        compression_metric_names_options=restricted_metrics or original_params.compression_metric_names_options,
+        evaluation_metrics=promising_space.get('evaluation_metric', original_params.evaluation_metrics),
+        concat_value_options=promising_space.get('join_string', original_params.concat_value_options),
+        get_sigma_options=promising_space.get('get_sigma', original_params.get_sigma_options),
+        aggregation_method_options=promising_space.get('aggregation_method', original_params.aggregation_method_options)
+    )
+
 
 compressors = all_subsets([c.value for c in CompressorType if c != CompressorType.SMILEZ])
 dissimilarity_metrics = all_subsets([
@@ -21,7 +42,7 @@ params = ParameterSpace(
     compression_metric_names_options=dissimilarity_metrics
 )
 
-# -------------------- Dataset de validación --------------------
+# Dataset de validación
 x_validation = [
     "molecule toxic heavy metal lead", "compound dangerous poison arsenic",
     "chemical harmful mercury substance", "element toxic cadmium dangerous",
@@ -29,7 +50,6 @@ x_validation = [
     "dangerous chemical formaldehyde", "harmful compound asbestos fiber",
     "toxic metal chromium dangerous", "poison substance strychnine lethal",
     "harmful chemical dioxin toxic", "dangerous compound pesticide toxic",
-
     "safe molecule water oxygen", "harmless compound sugar glucose",
     "beneficial substance vitamin C", "safe chemical sodium chloride",
     "harmless element calcium safe", "beneficial compound protein amino",
@@ -48,7 +68,7 @@ kw_samples_validation = [
     for _ in range(24)
 ]
 
-# -------------------- Dataset para búsqueda de parámetros (entrenamiento) --------------------
+# Dataset para búsqueda de parámetros (entrenamiento)
 x_train = [
     "chemical toxic pesticide harmful", "dangerous metal arsenic lead",
     "poisonous substance cyanide lethal", "harmful compound mercury cadmium",
@@ -68,23 +88,40 @@ kw_samples_train = [
     for _ in range(12)
 ]
 
-# -------------------- Optimización --------------------
-optimizer = ScOPEOptimizerAuto(
+# PHASE 1: Random exploration
+print("PHASE 1: Random exploration")
+random_optimizer = ScOPEOptimizerRandom(
     random_seed=42,
-    n_trials=100,
+    n_trials=5000,
     target_metric='log_loss',
-    study_name="parameter_search",
+    study_name="phase1_random_search",
     n_jobs=1,
     parameter_space=params
 )
 
-study = optimizer.optimize(x_train, y_train, kw_samples_train)
+random_study = random_optimizer.optimize(x_train, y_train, kw_samples_train)
+promising_space = random_optimizer.extract_promising_parameter_space(top_percent=20.0)
 
-best_model = optimizer.get_best_model()
+# PHASE 2: AutoSampler with restricted space
+print("\nPHASE 2: AutoSampler on promising regions")
+restricted_params = create_restricted_parameter_space(promising_space, params)
 
-optimizer.save_complete_analysis()
+auto_optimizer = ScOPEOptimizerAuto(
+    random_seed=42,
+    n_trials=1000,
+    target_metric='log_loss',
+    study_name="phase2_auto_search",
+    n_jobs=1,
+    parameter_space=restricted_params
+)
 
-# -------------------- Validación --------------------
+auto_study = auto_optimizer.optimize(x_train, y_train, kw_samples_train)
+
+# Use best model from AutoSampler
+best_model = auto_optimizer.get_best_model()
+auto_optimizer.save_complete_analysis()
+
+# Validación
 all_y_true = y_validation
 all_y_predicted = []
 all_y_probas = []
@@ -109,4 +146,8 @@ results = make_report(
     save_path='results'
 )
 
+# Comparison
+print(f"\nRandom best: {random_study.best_value:.4f}")
+print(f"AutoSampler best: {auto_study.best_value:.4f}")
+print(f"Improvement: {random_study.best_value - auto_study.best_value:.4f}")
 print(results)

@@ -73,11 +73,6 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
         print()
         
         self.print_parameter_space()
-        print("\nAutoSampler Strategy:")
-        print("• GPSampler: Early stages (excellent sample efficiency)")
-        print("• TPESampler: Categorical variables (flexible handling)")
-        print("• Dynamic switching: Adapts based on optimization progress")
-        print("• Automatic selection: No manual tuning required!")
         
         objective_func = self._create_objective_function(
             X_validation, y_validation, kw_samples_validation
@@ -312,14 +307,6 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             
             f.write("AUTOSAMPLER STRATEGY:\n")
             f.write("-" * 30 + "\n")
-            f.write("AutoSampler automatically selects the best algorithm based on:\n")
-            f.write("• Problem characteristics (continuous vs categorical parameters)\n")
-            f.write("• Optimization progress (early exploration vs late exploitation)\n") 
-            f.write("• Sample efficiency requirements\n\n")
-            f.write("Algorithm selection logic:\n")
-            f.write("• GPSampler: Early stages with excellent sample efficiency\n")
-            f.write("• TPESampler: Flexible handling of categorical variables\n")
-            f.write("• Dynamic switching: Adapts based on convergence patterns\n\n")
             
             f.write("PARAMETER SPACE:\n")
             f.write("-" * 30 + "\n")
@@ -348,31 +335,3 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
         print(f"  {self.study_name}_analysis_{self.study_date}.txt (human readable report)")
         print(f"\nTo view results: optuna-dashboard sqlite:///{self.output_path}/optuna_{self.study_name}.sqlite3")
     
-    def compare_with_baseline(self, baseline_optimizer, X_validation, y_validation, kw_samples_validation):
-        """Compare AutoSampler performance with another optimizer"""
-        print(f"\nComparing AutoSampler vs {type(baseline_optimizer).__name__}...")
-        
-        baseline_study = baseline_optimizer.optimize(X_validation, y_validation, kw_samples_validation)
-        
-        auto_best = self.study.best_value
-        baseline_best = baseline_study.best_value
-        
-        if self.get_optimization_direction() == 'maximize':
-            improvement = auto_best - baseline_best
-            better = auto_best > baseline_best
-        else:
-            improvement = baseline_best - auto_best  
-            better = auto_best < baseline_best
-        
-        print("\nComparison Results:")
-        print(f"   AutoSampler best: {auto_best:.4f}")
-        print(f"   {type(baseline_optimizer).__name__} best: {baseline_best:.4f}")
-        print(f"   Improvement: {improvement:.4f}")
-        print(f"   AutoSampler is {'Better' if better else 'Worse'}")
-        
-        return {
-            'auto_best': auto_best,
-            'baseline_best': baseline_best,
-            'improvement': improvement,
-            'auto_is_better': better
-        }
