@@ -25,7 +25,6 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
                  output_path: str = "./results",
                  n_trials: int = 75,
                  target_metric: Union[str, Dict[str, float]] = 'auc_roc',
-                 use_cache: bool = True,
                  ):
         """Initialize the AutoSampler optimizer."""
         super().__init__(
@@ -37,7 +36,6 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
             output_path=output_path,
             n_trials=n_trials,
             target_metric=target_metric,
-            use_cache=use_cache
         )
         
         try:
@@ -134,15 +132,6 @@ class ScOPEOptimizerAuto(ScOPEOptimizer):
         
         self._analyze_auto_sampler_performance()
         
-        cache_size = self._eval_cache_size_()
-        total_trials = len(self.study.trials)
-
-        cached_percent = 100 * cache_size / total_trials if total_trials > 0 else 0
-        not_cached_percent = 100 - cached_percent
-        
-        print(f"Cached evaluations (unique parameter sets): {cache_size} ({cached_percent:.2f}%)")
-        print(f"Non-cached evaluations (evaluations recomputed): {total_trials - cache_size} ({not_cached_percent:.2f}%)")
-
         self.print_best_configuration()
         
         return self.study

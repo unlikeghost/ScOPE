@@ -74,7 +74,6 @@ optimizer = ScOPEOptimizerAuto(
     n_trials=100,
     target_metric='log_loss',
     study_name="parameter_search",
-    use_cache=True,
     n_jobs=1,
     parameter_space=params
 )

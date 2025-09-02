@@ -115,9 +115,9 @@ class CompressionMatrix:
             metric=metric
         )
 
-        if _score <= 0:
+        if _score < 0:
             warnings.warn(
-                f"Expected disimilarity score <= 0, but got {_score}"
+                f"Expected disimilarity score < 0, but got {_score}"
                 f"with metric {metric}",
                 category=UserWarning
             )

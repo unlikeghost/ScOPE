@@ -107,7 +107,6 @@ class ScOPEOptimizer(ABC):
                  output_path: str = "./results",
                  n_trials: int = 50,
                  target_metric: Union[str, Dict[str, float]] = 'auc_roc',
-                 use_cache: bool = True
                  ):
         
         self.parameter_space = parameter_space or ParameterSpace()
@@ -141,20 +140,6 @@ class ScOPEOptimizer(ABC):
                 raise ValueError(f"Metric weights must sum to 1.0, got {total}")
         else:
             raise ValueError("target_metric must be str or dict")
-        
-        self.use_cache = use_cache
-        self._eval_cache = {}
-        self._cache_max_size = 1000  # Límite para evitar memory leaks
-        
-    def _make_cache_key(self, model):
-        """Create cache key for model parameters."""
-        model_params = model.to_dict()
-        key_str = json.dumps(model_params, sort_keys=True, default=str)
-        return hashlib.md5(key_str.encode()).hexdigest()
-
-    def _eval_cache_size_(self) -> int:
-        """Get current cache size."""
-        return len(self._eval_cache)
 
     def print_parameter_space(self):
         """Print detailed parameter space information."""
@@ -262,12 +247,6 @@ class ScOPEOptimizer(ABC):
                        ) -> Dict[str, float]:
         """Evaluate the model using cross-validation (parallel folds)."""
     
-        if self.use_cache:
-            key = self._make_cache_key(model)
-            if key in self._eval_cache:
-                return self._eval_cache[key]
-        else:
-            key = None
     
         indices = np.arange(len(X_samples))
         skf = StratifiedKFold(n_splits=self.cv_folds, shuffle=True, random_state=self.random_seed)
@@ -314,13 +293,6 @@ class ScOPEOptimizer(ABC):
             for metric in results[0]
         }
     
-        if self.use_cache and key is not None:
-            if len(self._eval_cache) > self._cache_max_size:
-                keep_size = int(self._cache_max_size * 0.8)
-                keys_to_keep = list(self._eval_cache.keys())[-keep_size:]
-                self._eval_cache = {k: self._eval_cache[k] for k in keys_to_keep}
-            self._eval_cache[key] = final_scores
-    
         return final_scores
 
     def calculate_objective_score(self, scores: Dict[str, float]) -> float:
@@ -363,9 +335,15 @@ class ScOPEOptimizer(ABC):
         """Objective function for Optuna."""
         
         def objective(trial):
-            try:
-                params = self.suggest_all_params(trial)
+            params = self.suggest_all_params(trial)
             
+            study_trials = trial.study.get_trials(deepcopy=False)
+            for t in study_trials:
+                if t.state and t.params == params:
+                    print(f"Skipping duplicate trial with params: {params}")
+                    return t.value
+                    
+            try:            
                 model = self.create_model_from_params(params)
                 
                 scores = self.evaluate_model(
